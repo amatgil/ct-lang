@@ -84,6 +84,8 @@ For example:
 
 ### Pattern matching
 
+`(todo)`
+
 ### Typeclasses
 Note that the `list-of-methods-with-a-default-impl` default implementation can't go inside the typeclass definition, and should instead be placed elsewhere
 ```
