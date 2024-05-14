@@ -11,10 +11,10 @@ The language contains:
 - Generics with easy-to-set class bounds
 - Functions as First Order Types
 - `Maybe` and `Either` as core parts of the language (ideally they'd be just another sum type, but I'm not sure how to integrate that into lisp style)
-
+- Polymorphism as a core principal in function writing: a function on lists must accept a `(List a`), and even the type constructor may be generic: `(impls (m '(Monad)) (m a))`
 
 ## Other elements
-- Looping will not be an entire DSL like in Common Lisp, it will be incredibly basic. Printing will not resemble `(format)` either.
+- Looping will not be an entire DSL like in Common Lisp, it will be incredibly basic. Printing will not resemble `(format)` either, etc.
 - All predicates must end in a question mark, as in: `(if (empty? xs) ... ...)`
 - Basic types are called: `String`, `Int` & `Uint`, `f32` & `f64`, `char` (unicode minimum unit)
 - Standard formatting is Lisp style, with two spaces
@@ -136,8 +136,8 @@ More interesting is what happens when you want to restrict `a` to being part of 
 
 
 ```
-(deffun isAllEqual?
-  ((impls (List a) '(Eq))
+(deffun isHomogenous?
+  ((where (a '(Eq)) (List a))
    bool)
   (xs)
   (match xs
@@ -149,12 +149,16 @@ More interesting is what happens when you want to restrict `a` to being part of 
   
 ```
 
-So, a bounded type is written as:
+So, a bounded type can be written in:
 
 ```
-(impls type list-of-typeclasses)
+(impls type list-of-typeclasses) <-- For if the entire type must implement the typeclass
+or
+(where list-of-bound-types-and-classes type) <-- For if only a bound type must implement it
 ```
 
-Which returns the `type`, but bounded. 
+`where` is to be used, for example, when the entire type doesn't need to be bounded: e.g. if `Tree`s don't need to be comparable but `a`s must: `(where (a '(Eq) (Tree a)))`
+
+Which both returns the `type`, but bounded. 
 
 [^1]: Get it? It's a _lisp_ called '_Ç_-lang', hehe.
