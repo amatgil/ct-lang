@@ -13,3 +13,5 @@ unsafe_code = "forbid"
 enum_glob_use = "deny"
 
 [dependencies]
+anyhow = "1.0.83"
+thiserror = "1.0.60"

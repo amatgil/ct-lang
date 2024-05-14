@@ -1,13 +1,100 @@
-use std::{fmt::Display, rc::Rc};
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, HashSet};
+use std::hash::Hash;
+use std::fmt::Display;
+use std::sync::Arc;
 
 mod repl;
+mod parsing;
+mod eval;
+
+pub use repl::*;
+pub use parsing::*;
+pub use eval::*;
 
 #[derive(Debug, Clone)]
 pub struct Env {
+    typeclasses: BTreeMap<(String, Tipus), Typeclass>,
+    typeclass_impls: BTreeMap<(String, Tipus, Typeclass), Arc<CtFunction>>,
+}
+
+impl Env {
+    pub fn new() -> Self {
+        /////// Typeclasses ///////
+        let class_eq = Typeclass {
+            name: "EQ".into(),
+            missing_members: HashSet::from([
+                ("EQ".into(), Tipus::Function(vec![
+                    Tipus::Generic('a'), Tipus::Generic('a'), Tipus::Bool])),
+            ]),
+            default_members: HashSet::from([]),
+        };
+        let class_add = Typeclass {
+            name: "ADD".into(),
+            missing_members: HashSet::from([
+                ("ADD".into(), Tipus::Function(vec![
+                    Tipus::Generic('a'), Tipus::Generic('a'), Tipus::Generic('a')])),
+            ]),
+            default_members: HashSet::from([]),
+        };
+        Self {
+            typeclasses: BTreeMap::from([
+                (("EQ".into(), Tipus::Int), class_eq.clone()),
+                (("EQ".into(), Tipus::Float), class_eq.clone()),
+                (("ADD".into(), Tipus::Int), class_add.clone()),
+                (("ADD".into(), Tipus::Float), class_add.clone()),
+            ]),
+            typeclass_impls: BTreeMap::new(),
+        }
+    }
+
+    /// Error means it wasn't found
+    pub fn get_fn(&self, t: &Tipus, nom: &str) -> Result<Arc<CtFunction>,()> {
+        for ((name, typ, class), f) in &self.typeclass_impls {
+            if class.name == nom { return Ok(f.clone()); }
+        }
+        for ((name, typ), class) in &self.typeclasses {
+            for member in &class.default_members {
+                if member.name == nom { return Ok(member.clone()); }
+            }
+        }
+        Err(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct CtFunction {
+    name: String,
+    f: CtFunctionInternal
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum CtFunctionInternal {
+    Builtin(Builtin),
+    Native {
+        id: u64,
+        body: Sexpr
+    }
+}
+
+impl CtFunction {
+    fn call(&self, args: &[Sexpr]) -> Sexpr {
+        todo!()
+    }
 }
 
 #[derive(Debug, Clone)]
+pub struct Typeclass {
+    name: String,
+    default_members: HashSet<Arc<CtFunction>>,
+    missing_members: HashSet<(String, Tipus)>, // Type must be a function type, obviously
+}
+
+
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Builtin {
+    // Keywords
     Deffun,
     Deftype,
     Deftypeclass,
@@ -15,22 +102,52 @@ pub enum Builtin {
     Match,
     Where,
     Impls,
+    Impl,
     Let,
+
+    // Default functions
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Print,
+    Car,
+    Cdr
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Tipus {
     Nil,
     Bool,
     Float,
     Int,
     String,
-    CompType(String, Rc<Tipus>), // E.g. (List a)
+    CompType(String, Arc<Tipus>), // E.g. (List a)
     Function(Vec<Tipus>),
+    Generic(char),
     UserDefined(String)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
+pub struct Float(f64);
+impl PartialEq for Float {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.total_cmp(&other.0) == Ordering::Equal
+    }
+}
+impl Eq for Float {}
+impl Display for Float {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+impl Hash for Float {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.to_bits().hash(state)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Atom {
     Nil,
     Bool(bool),
@@ -39,14 +156,30 @@ pub enum Atom {
     Symbol(String),
     String(String),
     Tipus(Tipus),
-    Float(f64),
+    Float(Float),
     Builtin(Builtin)
 }
 
-#[derive(Debug, Clone)]
+impl Atom {
+    fn tipusde(&self) -> Tipus {
+        match self {
+            Atom::Nil             => Tipus::Nil,
+            Atom::Bool(_)         => Tipus::Bool,
+            Atom::Int(_)          => Tipus::Int,
+            Atom::QuotedSymbol(_) => todo!(),
+            Atom::Symbol(_)       => todo!(),
+            Atom::String(_)       => todo!(),
+            Atom::Tipus(_)        => todo!(),
+            Atom::Float(_)        => todo!(),
+            Atom::Builtin(_)      => todo!(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Sexpr {
     Atom(Atom),
-    Comp(Vec<Rc<Sexpr>>),
+    Comp(Vec<Arc<Sexpr>>),
 }
 
 impl Display for Tipus {
@@ -65,6 +198,7 @@ impl Display for Tipus {
                 out.push_str("]");
                 out
             },
+            Tipus::Generic(c)     => c.to_string(),
             Tipus::UserDefined(_) => todo!(),
         })
     }
@@ -112,7 +246,16 @@ impl Display for Builtin {
             Builtin::Match        => "MATCH",
             Builtin::Where        => "WHERE",
             Builtin::Impls        => "IMPLS",
+            Builtin::Impl         => "IMPL",
             Builtin::Let          => "LET",
+            Builtin::Add          => "+",
+            Builtin::Sub          => "-",
+            Builtin::Mul          => "*",
+            Builtin::Div          => "/",
+            Builtin::Print        => "PRINT",
+            Builtin::Car          => "CAR",
+            Builtin::Cdr          => "CDR",
+
         })
     }
 }
