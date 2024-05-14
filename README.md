@@ -10,13 +10,16 @@ The language contains:
 - Typeclasses (à la Haskell)
 - Generics with easy-to-set class bounds
 - Functions as First Order Types
-- `Maybe` and `Either` as core parts of the language (ideally they'd be just another sum type, but I'm not sure how to integrate that into lisp type)
+- `Maybe` and `Either` as core parts of the language (ideally they'd be just another sum type, but I'm not sure how to integrate that into lisp style)
 
 
 ## Other elements
 - Looping will not be an entire DSL like in Common Lisp, it will be incredibly basic. Printing will not resemble `(format)` either.
 - All predicates must end in a question mark, as in: `(if (empty? xs) ... ...)`
 - Basic types are called: `String`, `Int` & `Uint`, `f32` & `f64`, `char` (unicode minimum unit)
+- Standard formatting is Lisp style, with two spaces
+- Comments are prefixes by either `<--` or `--`. Doccoments are prefixes with `<-->`
+- We will not have 52 ways to check for equality. There will only be one, dependant on the `Eq` typeclass
 
 ## Roadmap
 - [ ] Prototype spec
@@ -31,67 +34,113 @@ The language contains:
   - [ ] Emit native bytecode
 
 ## To Resolve
-
-
-Debate on whether to allow (set): do we want mutability?
-Macros seem too hard '>.>
-
-Will have:
-
-
-
-
-
-- file extension would be nice to be ct, if not taken
-- comments are marked with <--
-
-# Doubts:
-- How to write down generics? Also with an attribute 
-- How do I handle stuff like unwrapping in an aesthetically reasonable way for e.g. (head)?
+- How to write down generics? Perhaps via an attribute?
+- How do I handle stuff like unwrapping in an aesthetically reasonable way for e.g. `(head)`?
 - How do I create record types and access their fields without losing my sanity?
 - How do I pattern match effectively? How should e.g. (match) work? Especially the types!
 
 
-(deffun fib
-  (Int (List Int))                 <-- types, curried
-  (x)                                   <-- names except
-  (if (or? (=? x 0) (=? x 1))         <-- body
-     1
-     (+ (fib (- x 1)) (fib (- x 2)))
+## Basic syntax
+It's a lisp, so functions are called like `(f)` or `(f 1 2 3)`.
 
-In module std/list
-(deffun foldl
-  (Fn[a a a] a (List a))
-  (f acc xs)
-  (if (empty? xs)
-    acc
-    (foldl 'f (f acc (head xs)) (tail xs))))
+### Function definition
+Functions are defined as follows:
+```
+(deffun functionname
+  optional-doc-comment
+  list-of-arguments+return-types
+  list-of-argument-names
+  body-expr)
+```
 
-(deftype (List a) <- Q(?)list with generics 
-  '(Empty            <- possible varis of enum 
-  '(Cons a (List a)))
 
-(deftype (Tree a) 
-  '('(Leaf a)
-   '('(Left a) '(Right a))))
+### Conditionals
+#### `(if)`
+```
+(if cond expr-if-true expr-if-false)
+```
 
+#### `(case)`
+```
+(case expr
+  (pred-1 expr-1
+   pred-2 expr-2
+   pred-3 expr-3
+   ...
+   pred-n expr-n))
+```
+
+### Pattern matching
+
+### Typeclasses
+Note that the `list-of-methods-with-a-default-impl` default implementation can't go inside the typeclass definition, and should instead be placed elsewhere
+```
+(deftypeclass (name types)
+  class-bounds
+  list-of-methods-to-implement
+  list-of-methods-with-a-default-impl)
+```
+
+Example:
+```
+(deftypeclass (Eq a)
+  ()
+  (('= Fn[a a Bool]))     <-- Note that = is a normal valid function name
+  ())
+```
+
+```
+(deftypeclass (Monad m)
+  ((Functor m) (Applicative m))
+  ((>>= Fn[(m a) Fn[a (m b)] (m b)])            <-- Note that >>= is a normal valid function name
+   (return Fn[a (m a)])) 
+  ((>> whatever-this-is-called-here)))
+```
+
+### Generics (and restricting them)
+IMPORTANT: all single-letter, lower case types are interpreted as generics. Do note that type constructors must be lowercase (e.g. `Int` or `(List a)`)
+
+Accepting generics is easy. For example, you can have a list of any `a`:
+```
+(deftype (List a)
+  '((Empty)
+    (Cons a (List a))))
+```
+
+Here's a function that checks for the emptiness of _any_ `(List a)`
+```
 (deffun empty?
   ((List a) bool)
   (xs)
-  (match xs 
-    ((Empty) true)
-    ((Cons x t) false)))
+  (match xs
+   ((Empty) true
+    (Cons _ _) false)))
+  
+```
 
-(deffun fizzbuzz
-  (Int Nil)
-  (max)
-  (loop from 0 to max (
-
+More interesting is what happens when you want to restrict `a` to being part of a `typeclass`: for example, say we want to check if all elements of the list are equal:
 
 
+```
+(deffun isAllEqual?
+  ((impls (List a) '(Eq))
+   bool)
+  (xs)
+  (match xs
+   (((Empty) true)
+    ((Cons y (Empty)) true)
+    ((Cons y ys) (and
+                    (= y (head ys))
+                    (isAllEqual (tail ys)))))))
+  
+```
 
+So, a bounded type is written as:
 
+```
+(impls type list-of-typeclasses)
+```
 
-
+Which returns the `type`, but bounded. 
 
 [^1]: Get it? It's a _lisp_ called '_Ç_-lang', hehe.

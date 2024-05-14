@@ -1,0 +1,16 @@
+
+(deffun factors-of
+  (Int (List Int))
+  (x)
+  (let ((half (filter
+     (lambda (acc) (= (mod x acc) 0))
+     (range 1 (floor (sqrt (dec x)))))))
+     (flatten (map
+                (lambda (i) (get-both i x))
+                half))))
+
+(deffun get-both
+  <--> Given x and one of its factors, returns a list with that factor and its twin
+  (Int Int (List Int))
+  (i x)
+  (list (/ x i) i))

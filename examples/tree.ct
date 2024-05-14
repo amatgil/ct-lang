@@ -1,0 +1,14 @@
+
+(deftype (Tree a) 
+  '(Empty
+   (Node a (Tree a) (Tree a))))
+
+
+(deffun addOne
+  <--> Add `1` to each element of the tree in pre-order
+  ((Tree Int) (Tree Int))
+  (t)
+  (match t
+    ('(Empty) (Empty)
+     '(Node x left right)
+        (Node (inc x) (addOne left) (addOne right)))))

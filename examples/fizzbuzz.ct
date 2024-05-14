@@ -1,0 +1,19 @@
+
+(deffun fizzbuz
+  (Int (List Int))
+  (max)
+  (fizzGo 0 max 'nil))
+
+
+(deffun fizzGo
+  (Int Int (List String)
+  (x max)
+  (if (= x max)
+    'nil
+    (let ((n (case x
+      ((= 0 (% x 15)) "fizzbuzz"
+       (= 0 (% x 3)) "fizz"
+       (= 0 (% x 5)) "buzz"))))
+      (concat
+        (singleton n)
+        (fizzGo (inc x) max))))))

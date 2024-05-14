@@ -1,0 +1,33 @@
+-- Excerpts from the future std/list
+
+(deftype (List a)       <.- List with typed admitted by the type constructor
+  '(Empty               <-- possible variants of sum type
+   (Cons a (List a))))
+
+(deffun foldl
+  (Fn[a a a] a (List a))
+  (f acc xs)
+  (if (empty? xs)
+    acc
+    (foldl 'f (f acc (head xs)) (tail xs))))
+
+(deffun empty?
+  ((List a) bool)
+  (xs)
+  (match xs 
+    ((Empty) true)
+    ((Cons x t) false)))
+
+(deffun append
+  ((List a))
+  (xss)
+  (match xss
+   ((Empty) (Empty)
+    (Cons xs rest) (append xs (flatten xss)))))
+
+(deffun flatten
+  ((List (List a)) (List a))
+  (xss)
+  (match xss
+   ((Empty) (Empty)
+    (Cons xs rest) (append xs (flatten xss)))))
