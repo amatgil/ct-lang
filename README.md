@@ -24,7 +24,7 @@ The language contains:
 ## Roadmap
 - [ ] Prototype spec
 - [ ] Final spec
-- [ ] Emacs major mode
+- [ ] Emacs major mode (syntax highlighting)
 - [ ] Compiler
   - [ ] Parse 
   - [ ] Proper errors in parsing
@@ -35,10 +35,9 @@ The language contains:
   - [ ] Emit native bytecode
 
 ## To Resolve
-- How to write down generics? Perhaps via an attribute?
-- How do I handle stuff like unwrapping in an aesthetically reasonable way for e.g. `(head)`?
+- How do I handle unwrapping/pattern matching in an aesthetically pleasing and reasonable way for e.g. `(head)`?
 - How do I create record types and access their fields without losing my sanity?
-- How do I pattern match effectively? How should e.g. (match) work? Especially the types!
+- How do I pattern match _effectively_? How should e.g. (match) work? Especially the types!
 
 
 ## Basic syntax
