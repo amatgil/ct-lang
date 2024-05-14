@@ -112,7 +112,7 @@ Example:
 ```
 
 ### Generics (and restricting them)
-IMPORTANT: all single-letter, lower case types are interpreted as generics. Do note that type constructors must be lowercase (e.g. `Int` or `(List a)`)
+IMPORTANT: all single-letter, lower case types are interpreted as generics. Also note that type constructors must be uppercase (e.g. `Int` or `(List a)`)
 
 Accepting generics is easy. For example, you can have a list of any `a`:
 ```
