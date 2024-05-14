@@ -1,8 +1,8 @@
--- Excerpts from the future std/list
+<-- Excerpts from the future std/list
 
-(deftype (List a)       <.- List with typed admitted by the type constructor
-  '(Empty               <-- possible variants of sum type
-   (Cons a (List a))))
+(deftype (List a)         <-- List with typed admitted by the type constructor
+  '((Empty)               <-- possible variants of sum type
+    (Cons a (List a))))
 
 (deffun foldl
   (Fn[a a a] a (List a))
@@ -19,11 +19,10 @@
     ((Cons x t) false)))
 
 (deffun append
-  ((List a))
-  (xss)
-  (match xss
-   ((Empty) (Empty)
-    (Cons xs rest) (append xs (flatten xss)))))
+  (a (List a) (List a))
+  (x xs)
+  (Cons x xs))
+   
 
 (deffun flatten
   ((List (List a)) (List a))

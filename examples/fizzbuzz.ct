@@ -1,6 +1,6 @@
 
 (deffun fizzbuz
-  (Int (List Int))
+  (Int (List String))
   (max)
   (fizzGo 0 max 'nil))
 

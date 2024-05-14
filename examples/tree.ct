@@ -1,7 +1,7 @@
 
 (deftype (Tree a) 
-  '(Empty
-   (Node a (Tree a) (Tree a))))
+  '((Empty)
+    (Node a (Tree a) (Tree a))))
 
 
 (deffun addOne
@@ -9,6 +9,7 @@
   ((Tree Int) (Tree Int))
   (t)
   (match t
-    ('(Empty) (Empty)
+    ('(Empty)
+        (Empty)
      '(Node x left right)
         (Node (inc x) (addOne left) (addOne right)))))
