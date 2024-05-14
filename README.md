@@ -24,6 +24,7 @@ The language contains:
 ## Roadmap
 - [ ] Prototype spec
 - [ ] Final spec
+- [ ] Emacs major mode
 - [ ] Compiler
   - [ ] Parse 
   - [ ] Proper errors in parsing
