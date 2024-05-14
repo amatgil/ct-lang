@@ -53,6 +53,18 @@ Functions are defined as follows:
   body-expr)
 ```
 
+For example:
+
+```
+(deffun factorial
+  <--> Return the factorial of the argument
+  (Uint Uint)      <-- Takes in an unsigned integer, returns another one
+  (n)              <-- input Int is bound to `n`
+  (if (= n 0)      <-- Standard factorial definition
+    1
+    (* n (fact (dec n)))))
+```
+
 
 ### Conditionals
 #### `(if)`
