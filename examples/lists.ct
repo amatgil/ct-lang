@@ -18,6 +18,13 @@
     ((Empty) true)
     ((Cons x t) false)))
 
+(deffun append
+  ((List a))
+  (xss)
+  (match xss
+   ((Empty) (Empty)
+    (Cons xs rest) (append xs (flatten xss)))))
+
 (deffun flatten
   ((List (List a)) (List a))
   (xss)
