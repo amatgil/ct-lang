@@ -1,0 +1,21 @@
+
+(deftype Stoplight
+  '((Red)
+    (Yellow)
+    (Green)))
+
+(impl StopLight Eq 
+  ((deffun =?
+    (StopLight Stoplight Bool)
+    (lhs rhs)
+    (match '(lhs rhs)
+     ((Red) (Red)) true
+     ((Yellow) (Yellow)) true
+     ((Green) (Green)) true
+     (otherwise) false)))) <-- Anything can be bound to a variable, the word `otherwise` has no special syntax around it
+     
+
+(deffun safe-to-go?
+  (Stoplight Bool)
+  (x)
+  (= x (Green)))    <-- (Green) calls the type constructor `Green`, so we've got a Stoplight that's green. We can compare against it because we implemented `Eq` above

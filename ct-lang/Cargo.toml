@@ -1,0 +1,15 @@
+[package]
+name = "ct"
+version = "0.1.0"
+authors = ["Amat Gil <amatgilvinyes@gmail.com>"]
+description = "Compiler for Ç-lang"
+repository = "https://github.com/amatgil/ct-lang"
+edition = "2021"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+enum_glob_use = "deny"
+
+[dependencies]

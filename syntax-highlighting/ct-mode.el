@@ -15,7 +15,7 @@
    :syntax-table ct-mode-syntax-table
    (set (make-local-variable 'font-lock-defaults) '(ct-font-lock t nil nil)))
 
-(defconst ct-keywords (concat "\\<" (regexp-opt '("deffun" "deftype" "deftypeclass" "if" "match" "where" "impls" "let")) "\\>"))
+(defconst ct-keywords (concat "\\<" (regexp-opt '("deffun" "deftype" "deftypeclass" "if" "match" "where" "impls" "impl" "let")) "\\>"))
 
 (defconst ct-font-lock
   `(

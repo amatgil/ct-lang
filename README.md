@@ -20,9 +20,11 @@ The language contains:
 - Standard formatting is Lisp style, with two spaces
 - Comments are prefixes by either `<--` or `--`. Doccoments are prefixes with `<-->`
 - We will not have 52 ways to check for equality. There will only be one, dependant on the `Eq` typeclass
+- Booleans are written `#true` and `#false`
 
 ## Roadmap
-- [ ] Prototype spec
+- [x] Prototype spec
+- [ ] Formalize the grammar
 - [ ] Final spec
 - [ ] Emacs major mode (syntax highlighting)
 - [ ] Compiler
