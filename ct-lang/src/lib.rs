@@ -15,7 +15,7 @@ pub use eval::*;
 #[derive(Debug, Clone)]
 pub struct Env {
     typeclasses: BTreeMap<(String, Tipus), Typeclass>,
-    typeclass_impls: BTreeMap<(String, Tipus, Typeclass), Arc<CtFunction>>,
+    typeclass_impls: BTreeMap<(Tipus, Typeclass), Arc<CtFunction>>,
 }
 
 impl Env {
@@ -37,6 +37,14 @@ impl Env {
             ]),
             default_members: HashSet::from([]),
         };
+
+        let int_add: CtFunction = {
+            let mut f = CtFunction {
+                name: "ADD".into(),
+                f: CtFunctionInternal::Builtin(Builtin::Add),
+            };
+            f
+        };
         Self {
             typeclasses: BTreeMap::from([
                 (("EQ".into(), Tipus::Int), class_eq.clone()),
@@ -44,17 +52,20 @@ impl Env {
                 (("ADD".into(), Tipus::Int), class_add.clone()),
                 (("ADD".into(), Tipus::Float), class_add.clone()),
             ]),
-            typeclass_impls: BTreeMap::new(),
+            typeclass_impls: BTreeMap::from([
+                ((Tipus::Int, class_add.clone()), int_add.into())
+            ]),
         }
     }
 
     /// Error means it wasn't found
     pub fn get_fn(&self, t: &Tipus, nom: &str) -> Result<Arc<CtFunction>,()> {
-        for ((name, typ, class), f) in &self.typeclass_impls {
+        for ((typ, class), f) in &self.typeclass_impls {
             if class.name == nom { return Ok(f.clone()); }
         }
         for ((name, typ), class) in &self.typeclasses {
             for member in &class.default_members {
+                dbg!(&member.name, &class);
                 if member.name == nom { return Ok(member.clone()); }
             }
         }
@@ -83,11 +94,27 @@ impl CtFunction {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq)]
 pub struct Typeclass {
     name: String,
     default_members: HashSet<Arc<CtFunction>>,
     missing_members: HashSet<(String, Tipus)>, // Type must be a function type, obviously
+}
+
+impl PartialEq for Typeclass {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+impl PartialOrd for Typeclass {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(&other))
+    }
+}
+impl Ord for Typeclass {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.name.cmp(&other.name)
+    }
 }
 
 
