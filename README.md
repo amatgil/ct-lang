@@ -24,22 +24,27 @@ The language contains:
 
 ## Roadmap
 - [x] Prototype spec
+- [-] Emacs major mode (syntax highlighting)
 - [ ] Formalize the grammar
-- [ ] Final spec
-- [ ] Emacs major mode (syntax highlighting)
-- [ ] Compiler
-  - [ ] Parse 
-  - [ ] Proper errors in parsing
-  - [ ] Generate AST
+- [ ] Prototype lexer
+  - [ ] Proper errors in lexing
+- [ ] Finalize lexer
+- [ ] Prototype parser (AST)
+  - [ ] Syntax checker
   - [ ] Type checking
-  - [ ] Optimization passes (on its own AST)
-  - [ ] Evaluate final AST
-  - [ ] Emit native bytecode
+  - [ ] Proper errors in parsing
+- [ ] Finalize parser (AST)
+- [ ] Final spec
+- [ ] Compilation
+    - [ ] Start emitting for LLVM [Helpful link](https://llvm.org/docs/tutorial/MyFirstLanguageFrontend/LangImpl01.html)
+    - [ ] LLVM output
 
 ## To Resolve
 - How do I handle unwrapping/pattern matching in an aesthetically pleasing and reasonable way for e.g. `(head)`?
 - How do I create record types and access their fields without losing my sanity?
 - How do I pattern match _effectively_? How should e.g. (match) work? Especially the types!
+- Will function accept variadic arguments? How would that interact with the type checker?
+  - Possible solution: do not, make 'variadics' mean 'a function that takes in a list'
 
 
 ## Basic syntax
@@ -162,5 +167,11 @@ or
 `where` is to be used, for example, when the entire type doesn't need to be bounded: e.g. if `Tree`s don't need to be comparable but `a`s must: `(where (a '(Eq) (Tree a)))`
 
 Which both returns the `type`, but bounded. 
+
+
+## Helpful links
+- Making an interpreter: https://vishpat.github.io/lisp-rs/overview.html
+- Outputting to LLVM: https://llvm.org/docs/tutorial/
+
 
 [^1]: Get it? It's a _lisp_ called '_Ç_-lang', hehe.

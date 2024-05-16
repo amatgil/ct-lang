@@ -154,7 +154,14 @@ pub enum Tipus {
     CompType(String, Arc<Tipus>), // E.g. (List a)
     Function(Vec<Tipus>),
     Generic(char),
-    UserDefined(String)
+    UserDefined(String),
+    Internal // For things like deffun, deftype, ...
+}
+
+impl Builtin {
+    fn tipusde(&self) -> Tipus {
+        Tipus::Internal // TODO: Make sure this makes sense
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -200,7 +207,7 @@ impl Atom {
             Atom::String(_)       => todo!(),
             Atom::Tipus(_)        => todo!(),
             Atom::Float(_)        => todo!(),
-            Atom::Builtin(_)      => todo!(),
+            Atom::Builtin(b)      => b.tipusde(),
         }
     }
 }
@@ -229,6 +236,7 @@ impl Display for Tipus {
             },
             Tipus::Generic(c)     => c.to_string(),
             Tipus::UserDefined(_) => todo!(),
+            Tipus::Internal       => "#internal_type".to_string(),
         })
     }
 }

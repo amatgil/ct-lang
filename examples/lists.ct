@@ -1,8 +1,8 @@
 <-- Excerpts from the future std/list
 
-(deftype (List a)         <-- List with typed admitted by the type constructor
+(deftype (List a)         <-- List with type(s) admitted by the type constructor
   '((Empty)               <-- possible variants of sum type
-    (Cons a (List a))))
+    (Cons a (List a))))   <-- each variant is a product type
 
 (deffun foldl
   (Fn[a a a] a (List a))

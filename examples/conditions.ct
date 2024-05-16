@@ -18,4 +18,4 @@
 (deffun safe-to-go?
   (Stoplight Bool)
   (x)
-  (= x (Green)))    <-- (Green) calls the type constructor `Green`, so we've got a Stoplight that's green. We can compare against it because we implemented `Eq` above
+  (=? x (Green)))    <-- (Green) calls the type constructor `Green`, so we've got a Stoplight that's green. We can compare against it because we implemented `Eq` above
