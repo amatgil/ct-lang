@@ -6,7 +6,7 @@
 
 
 (deffun fizzGo
-  (Int Int (List String)
+  (Int Int (List String))
   (x max)
   (if (= x max)
     'nil
@@ -16,4 +16,4 @@
        (= 0 (% x 5)) "buzz"))))
       (concat
         (singleton n)
-        (fizzGo (inc x) max))))))
+        (fizzGo (inc x) max)))))

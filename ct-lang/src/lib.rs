@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::Hash;
 use std::fmt::Display;
 use std::sync::Arc;
@@ -16,6 +16,7 @@ pub use eval::*;
 pub struct Env {
     typeclasses: BTreeMap<(String, Tipus), Typeclass>,
     typeclass_impls: BTreeMap<(Tipus, Typeclass), Arc<CtFunction>>,
+    bound_vars: HashMap<String, Atom>,
 }
 
 impl Env {
@@ -55,6 +56,7 @@ impl Env {
             typeclass_impls: BTreeMap::from([
                 ((Tipus::Int, class_add.clone()), int_add.into())
             ]),
+            bound_vars: HashMap::new(),
         }
     }
 
@@ -119,7 +121,7 @@ impl Ord for Typeclass {
 
 
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Builtin {
     // Keywords
     Deffun,

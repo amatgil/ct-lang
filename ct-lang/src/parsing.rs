@@ -15,9 +15,11 @@ enum ParsingError {
 // https://vishpat.github.io/lisp-rs/overview.html
 /****************** LEXER ***********************/
 
+#[derive(Debug, Clone, Copy)]
 enum Token {
     LParen,
     RParen,
+    Quote,
     Builtin(Builtin),
     Tipus,
     Atom,
