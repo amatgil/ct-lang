@@ -53,7 +53,7 @@ fn fib() {
 }
 
 fn main() -> Result<(), anyhow::Error>{
-    start_repl()?;
+    //start_repl()?;
     //fib();
     Ok(())
 }
