@@ -3,6 +3,8 @@
 
 Examples can be found under `examples`.
 
+(Expect indiscriminate commiting to `master` before version 1.0.0!)
+
 ## Core ideals
 The language contains:
 - No mutability, no side-effects. This is _mostly_ a functional language, though it contains nice-to-haves like basic loops
