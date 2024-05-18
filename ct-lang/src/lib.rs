@@ -5,11 +5,11 @@ use std::fmt::Display;
 use std::sync::Arc;
 
 mod repl;
-mod parsing;
+mod translating;
 mod eval;
 
 pub use repl::*;
-pub use parsing::*;
+pub use translating::*;
 pub use eval::*;
 
 #[derive(Debug, Clone)]

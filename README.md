@@ -22,6 +22,23 @@ The language contains:
 - We will not have 52 ways to check for equality. There will only be one, dependant on the `Eq` typeclass
 - Booleans are written `#true` and `#false`
 
+## Compilation Pipeline
+```
+Input --> Token Stream --> AST_1 --> ... --> AST_n --> LLVM --> Native code
+       ^                ^             ^             ^        ^
+       |-- Lexer        |             |             |        |-- LLVM magic
+                        |             |             |-- Emitting                       
+                        |             |-- N optimization passes
+                        |-- Parser                                                                
+```
+
+The Lexer and Parser are under `translating.rs`, the rest are under the roadmap.
+
+The used ASTs are, as of now (this might be absolute nonsense):
+- 1: First pass, raw from the stream
+- 2: Types are now assigned
+- 3: Functions have been verified as valid (incl. checking if the typeclass contains them, etc.)
+
 ## Roadmap
 - [x] Prototype spec
 - [-] Emacs major mode (syntax highlighting)
@@ -30,6 +47,7 @@ The language contains:
   - [ ] Proper errors in lexing
 - [ ] Finalize lexer
 - [ ] Prototype parser (AST)
+- [ ] Interpreting AST, in passes
   - [ ] Syntax checker
   - [ ] Type checking
   - [ ] Proper errors in parsing
