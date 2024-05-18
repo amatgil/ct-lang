@@ -29,9 +29,9 @@ The language contains:
 Input --> Token Stream --> AST_1 --> ... --> AST_n --> LLVM --> Native code
        ^                ^             ^             ^        ^
        |-- Lexer        |             |             |        |-- LLVM magic
-                        |             |             |-- Emitting                       
+                        |             |             |-- Emitting
                         |             |-- N optimization passes
-                        |-- Parser                                                                
+                        |-- Parser
 ```
 
 The Lexer and Parser are under `translating.rs`, the rest are under the roadmap.
@@ -45,7 +45,7 @@ The used ASTs are, as of now (this might be absolute nonsense):
 - [x] Prototype spec
 - [-] Emacs major mode (syntax highlighting)
 - [ ] Formalize the grammar
-- [ ] Prototype lexer
+- [x] Prototype lexer
   - [ ] Proper errors in lexing
 - [ ] Finalize lexer
 - [ ] Prototype parser (AST)

@@ -1,17 +1,9 @@
 
 use crate::*;
 
-#[derive(thiserror::Error, Debug, Clone, Copy)]
-enum ParsingError {
-    #[error("did not encounter an opening paren when expected")]
-    NoOpeningParen,
-    #[error("number of parens is mismatched")]
-    MismatchedParens,
-    #[error("empty input")]
-    EmptyInput,
-}
-
-/****************** LEXER ***********************/
+/************************************************************
+ ************************* LEXER ****************************
+ ************************************************************/
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Token<'a> {
@@ -119,6 +111,34 @@ impl<'a> Display for Token<'a> {
 //    
 //}
 
+/************************************************************
+ ************************* PARSER ***************************
+ ************************************************************/
+
+#[derive(thiserror::Error, Debug, Clone, Copy)]
+enum ParsingError {
+    #[error("did not encounter an opening paren when expected")]
+    NoOpeningParen,
+    #[error("number of parens is mismatched")]
+    MismatchedParens,
+    #[error("empty input")]
+    EmptyInput,
+}
+
+enum Ast1Tok {
+    // TODO
+}
+
+/// Stage 1 of the AST passes: directly from the parsing, where most errors will be caught
+enum Ast1 {
+    Leaf(Ast1Tok),
+    Node(Vec<Ast1>)
+}
+
+fn ast1_pass(mut input: TokenStream) -> Ast1 {
+    todo!()
+}
+
 /// s cannot be empty
 /// Only for when you know it must be a type
 fn str_to_tipus(s: &str) -> Tipus {
@@ -160,6 +180,9 @@ fn str_to_quoted_string(s: &str) -> Option<String> {
     }
 }
 
+/************************************************************
+ ************************* TESTS ****************************
+ ************************************************************/
 
 #[test]
 fn quoted_strings() {
@@ -202,17 +225,6 @@ fn harder_token_stream() {
     assert!(s.next().is_none());
 }
 
-/****************** PARSER ***********************/
-
-// /// *Should* be non-copy, hopefully
-//pub fn parse_sexpr(input: &str) -> Result<Sexpr, anyhow::Error> {
-//    if input.is_empty() { return Err(ParsingError::EmptyInput)?; }
-//    let mut list = Vec::new();
-//    let mut stream = input.chars();
-//    if stream.next().unwrap() != '(' { return Err(ParsingError::NoOpeningParen)?; }
-//    let verb: String = stream.by_ref().take_while(|&c| c != ' ').collect();
-//    todo!()
-//}
 
 
 
