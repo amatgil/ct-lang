@@ -7,6 +7,7 @@ use std::sync::Arc;
 mod repl;
 mod translating;
 mod eval;
+mod parser;
 
 pub use repl::*;
 pub use translating::*;
