@@ -7,6 +7,7 @@ struct Symbol(String);
 /// TODO: enumerate builtin types while allowing for user-defined ones
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 enum Type {
+    Unit,
     Nat,
     Bool,
     Fn
@@ -30,7 +31,7 @@ impl Atom {
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub enum ExprC {
-    /// 
+    /// An atomic expression
     Atom(Atom),
     /// An identifier, to be looked up in the environment
     Identifier(Symbol),
@@ -39,7 +40,7 @@ pub enum ExprC {
         f: Symbol,
         args: Vec<ExprC>
     },
-    /// A function definition
+    /// A function definition, evaluates to the function it defines
     Deffun {
         name: Symbol,
         arg_types: Vec<Type>,
@@ -47,6 +48,7 @@ pub enum ExprC {
         output_type: Type,
         body: Box<ExprC>
     },
+    /// Basic conditionals
     IfElse {
         clause: Box<ExprC>,
         truepath: Box<ExprC>,
@@ -56,6 +58,7 @@ pub enum ExprC {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum ÇValue {
+    Unit,
     Atom(Atom),
     Lambda {
         args: Vec<(Symbol, Type)>,
@@ -74,11 +77,9 @@ impl Env {
     fn lookup(&self, id: Symbol) -> Option<&ÇValue> {
         self.bindings.get(&id)
     }
-    fn add(mut self, sym: Symbol, val: ÇValue) -> Result<Self, ()> {
-        match self.bindings.insert(sym, val) {
-            Some(_) => Err(()),
-            None => Ok(self),
-        }
+    fn add(mut self, sym: Symbol, val: ÇValue) -> Self {
+        self.bindings.insert(sym, val);
+        self
     }
 }
 
@@ -88,13 +89,13 @@ enum InterpErr {
     TypeMismatch {
         expected: Type,
         got: Type,
-    }
+    },
 }
 
 fn interp(expr: ExprC, mut env: Env) -> Result<(ÇValue, Env), InterpErr> {
     match dbg!(expr) {
         ExprC::Atom(a) => Ok((ÇValue::Atom(a), env)),
-        ExprC::FunCall {f, args } => {
+        ExprC::FunCall { f, args } => {
             let f = env.lookup(f.clone()).ok_or(InterpErr::UnboundVariable(f))?;
             match f {
                 // TODO: typecheck
@@ -105,13 +106,14 @@ fn interp(expr: ExprC, mut env: Env) -> Result<(ÇValue, Env), InterpErr> {
                     if arg_types.len() != args.len() { todo!("type error"); }
                     for (e, (s, _t)) in izip!(args, arg_types) {
                         let (v, _) = interp(e, og_env.clone())?;
-                        fn_env = fn_env.add(s.clone(), v).map_err(|_|InterpErr::UnboundVariable(s.clone()))?;
+                        fn_env = fn_env.add(s.clone(), v);
                         //TODO: typecheck t with s (Actually, all the typechecking should be done _before_ the interpreting.. hmm
                     }
                     dbg!(&fn_env);
                     dbg!(interp(body.clone(), fn_env))
                 },
                 ÇValue::Atom(a) => Err(InterpErr::TypeMismatch{ expected: Type::Fn, got: a.type_of() }),
+                ÇValue::Unit => Err(InterpErr::TypeMismatch{ expected: Type::Fn, got: Type::Unit }),
             }
         },
         ExprC::Identifier(id) => Ok((env.lookup(id.clone()).ok_or(InterpErr::UnboundVariable(id))?.clone(), env)),
@@ -122,7 +124,8 @@ fn interp(expr: ExprC, mut env: Env) -> Result<(ÇValue, Env), InterpErr> {
                 args: izip!(arg_names, arg_types).collect(),
                 output_type
             };
-            todo!("Update env to hold `f` with {name}")
+            env = env.add(name, f);
+            Ok((ÇValue::Unit, env))
         },
         ExprC::IfElse { clause, truepath, falsepath } => {
             let (p, new_env) = interp(*clause, env)?;
@@ -131,7 +134,7 @@ fn interp(expr: ExprC, mut env: Env) -> Result<(ÇValue, Env), InterpErr> {
             } else if ÇValue::Atom(Atom::Bool(false)) == p {
                 interp(*falsepath, new_env)
             } else {
-                todo!("Return type error: p must be a bool")
+                unreachable!("Internal type erorr: clause in `if`")
             }
         },
     }
@@ -161,24 +164,42 @@ fn atoms() {
 
 #[test]
 fn fun_app() {
+    // Lambda true cond: lambda x. lambda y. x
+    let two = ExprC::Atom(Atom::Nat(2));
+    let three = ExprC::Atom(Atom::Nat(3));
+
+    let x = (Symbol("x".into()), Type::Nat);
+    let y = (Symbol("y".into()), Type::Nat);
+
     let f = ÇValue::Lambda {
-        args: vec![(Symbol("x".into()), Type::Nat), (Symbol("y".into()), Type::Nat)],
-        body: todo!("(+ x y)"),
+        args: vec![x, y],
+        body: ExprC::Identifier(Symbol("x".into())),
         output_type: Type::Nat, 
     };
     let mut env = Env::default();
-    env = env.add(Symbol("f".into()), f).unwrap();
+    env = env.add(Symbol("f".into()), f);
 
     let e = ExprC::FunCall {
         f: Symbol("f".into()),
-        args: vec![ExprC::Atom(Atom::Nat(2)), ExprC::Atom(Atom::Nat(3))],
+        args: vec![two, three],
     };
 
     assert_eq!(
         interp(e, env).unwrap().0,
-        ÇValue::Atom(Atom::Nat(5)),
+        ÇValue::Atom(Atom::Nat(2)),
     )
+}
 
+#[test]
+fn conditionals() {
+    let e = ExprC::IfElse {
+        clause: Box::new(ExprC::Atom(Atom::Bool(true))),
+        truepath: Box::new(ExprC::Atom(Atom::Nat(5))),
+        falsepath: Box::new(ExprC::Atom(Atom::Nat(6))),
+    };
 
-
+    assert_eq!(
+        interp(e, Env::default()).unwrap().0,
+        ÇValue::Atom(Atom::Nat(5))
+    )
 }
