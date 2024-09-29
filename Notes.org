@@ -1,0 +1,6 @@
+* Notes on general language design
+To make sure I don't lose the plot.
+
+
+Binding := maps `symbol -> value`
+Environment := Set of bindings
