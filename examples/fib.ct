@@ -1,6 +1,6 @@
 
 (deffun fib
-  (Int (List Int))                      <-- argument types, curried
+  (Nat (List Nat))                      <-- argument types, curried
   (x)                                   <-- names of argument
   (if (or? (=? x 0) (=? x 1))           <-- body expression
      1

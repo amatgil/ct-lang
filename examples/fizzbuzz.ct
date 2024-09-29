@@ -1,12 +1,12 @@
 
 (deffun fizzbuz
-  (Int (List String))
+  (Nat (List String))
   (max)
   (fizzGo 0 max 'nil))
 
 
 (deffun fizzGo
-  (Int Int (List String))
+  (Nat Nat (List String))
   (x max)
   (if (=? x max)
     'nil

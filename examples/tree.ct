@@ -6,7 +6,7 @@
 
 (deffun addOne
   <--> Add `1` to each element of the tree in pre-order
-  ((Tree Int) (Tree Int))
+  ((Tree Nat) (Tree Nat))
   (t)
   (match t
     ('(Empty)
