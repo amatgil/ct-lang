@@ -4,7 +4,7 @@ The Lexer: turn the raw &str into a `Token` steam
 Good example: https://github.com/kaikalii/cube/blob/master/src/lex.rs
 */
 
-use std::fmt::Display;
+use std::{fmt::Display, iter};
 
 pub fn lex<'a>(input: &'a str) -> Result<Vec<Token<'a>>, LexError> {
     Lexer {
@@ -130,13 +130,11 @@ impl<'l> Lexer<'l> {
     }
     /// Matches string. If there's a match, the cursor is advanced. If not, there are no side effects
     fn next_chars_exact(&mut self, s: &str) -> Result<bool, LexError> {
-        dbg!(&self, s);
         let n = s.len();
         let mut text = self.input.chars().skip(self.loc.pos).peekable();
         let mut s = s.chars().peekable();
 
         while let (Some(c1), Some(c2)) = (text.peek(), s.peek()) {
-            dbg!(c1, c2);
             if c1 != c2 {
                 return Ok(false);
             }
@@ -145,7 +143,6 @@ impl<'l> Lexer<'l> {
             text.next();
         }
 
-        dbg!(&text, &s);
         match (text.peek(), s.peek()) {
             (Some(_), Some(_)) => unreachable!("while above will not exist while this occurs"),
             (_, None) => {
@@ -173,21 +170,23 @@ impl<'l> Lexer<'l> {
     fn run(mut self) -> Result<Vec<Token<'l>>, LexError> {
         use TokenKind as TK;
 
-        let mut tokens: Vec<Token<'l>> = Vec::new();
+        let mut tokens: Vec<Token<'_>> = Vec::new();
         loop {
             if self.can_continue() {
                 let _ = self.advance_cursor_while(|c| " \t\n".contains(c));
-                let start = self.loc;
+                let start = dbg!(self.loc);
                 if let Some(c) = self.next_char()? {
-                    tokens.push(match c {
-                        '(' => with_span(TK::ParenOpen, start, self.loc),
-                        ')' => with_span(TK::ParenClose, start, self.loc),
-                        '<' if dbg!(self.next_chars_exact("-->")) == Ok(true) => {
-                            with_span(TK::CommentStart, start, self.loc)
+                    let (t, l) = match c {
+                        '(' => (with_span(TK::ParenOpen, start, self.loc), self),
+                        ')' => (with_span(TK::ParenClose, start, self.loc), self),
+                        '<' if self.next_chars_exact("-->") == Ok(true) => {
+                            (with_span(TK::CommentStart, start, self.loc), self)
                         }
-                        '<' if dbg!(self.next_chars_exact("--")) == Ok(true) => {
-                            with_span(TK::CommentStart, start, self.loc)
+                        '<' if self.next_chars_exact("--") == Ok(true) => {
+                            (with_span(TK::CommentStart, start, self.loc), self)
                         }
+                        '\'' => (with_span(TK::Quote, start, self.loc), self),
+                        c if c.is_digit(10) => self.lex_number(start, c),
                         _ => {
                             return Err(LexError {
                                 kind: LexErrorKind::UnrecognizedToken(c),
@@ -197,16 +196,47 @@ impl<'l> Lexer<'l> {
                                 },
                             })
                         }
-                    })
+                    };
+                    self = l;
+                    tokens.push(t);
                 } else {
-                    break;
+                    break; // We're out of chars!
                 }
             } else {
-                break;
+                break; // We're out of chars but in a different way
             }
         }
 
         Ok(tokens)
+    }
+    fn lex_number(self, start: Loc, first_char: char) -> (Token<'l>, Self) {
+        let cs = iter::once(first_char)
+            .chain(self
+                   .input
+                   .chars()
+                   .skip(self.loc.pos)
+                   .inspect(|x| { dbg!(&x); } )
+                   .take_while(|&c| char::is_digit(c, 10)))
+            .collect::<String>();
+
+        let n = cs.len();
+        let end_loc = Loc {
+            pos: self.loc.pos + n,
+            line: self.loc.line,
+            col: self.loc.col + n,
+        };
+
+        (Token {
+            typ: TokenKind::Literal(cs),
+            span: Span {
+                start,
+                end: end_loc,
+            },
+        },
+         Self {
+             input: self.input,
+             loc: end_loc,
+         })
     }
 }
 
@@ -461,6 +491,126 @@ fn whitespace() {
             },
         },
     ];
+    println!("gotten:");
+    print_tokens(&l.clone().unwrap());
+    println!("expected");
+    print_tokens(&expected);
+    assert_eq!(l.unwrap(), expected)
+}
+
+#[test]
+fn numeric() {
+    let input = "(1 3 78 1231 777777)";
+    let l = lex(input);
+
+    let expected = vec![
+        Token {
+            typ: TokenKind::ParenOpen,
+            span: Span {
+                start: Loc {
+                    pos: 0,
+                    line: 0,
+                    col: 0,
+                },
+                end: Loc {
+                    pos: 1,
+                    line: 0,
+                    col: 1,
+                },
+            },
+        },
+        Token {
+            typ: TokenKind::Literal("1".into()),
+            span: Span {
+                start: Loc {
+                    pos: 1,
+                    line: 0,
+                    col: 1,
+                },
+                end: Loc {
+                    pos: 2,
+                    line: 0,
+                    col: 2,
+                },
+            },
+        },
+        Token {
+            typ: TokenKind::Literal("3".into()),
+            span: Span {
+                start: Loc {
+                    pos: 3,
+                    line: 0,
+                    col: 3,
+                },
+                end: Loc {
+                    pos: 4,
+                    line: 0,
+                    col: 4,
+                },
+            },
+        },
+        Token {
+            typ: TokenKind::Literal("78".into()),
+            span: Span {
+                start: Loc {
+                    pos: 5,
+                    line: 0,
+                    col: 5,
+                },
+                end: Loc {
+                    pos: 7,
+                    line: 0,
+                    col: 7,
+                },
+            },
+        },
+        Token {
+            typ: TokenKind::Literal("1231".into()),
+            span: Span {
+                start: Loc {
+                    pos: 8,
+                    line: 0,
+                    col: 8,
+                },
+                end: Loc {
+                    pos: 12,
+                    line: 0,
+                    col: 12,
+                },
+            },
+        },
+        Token {
+            typ: TokenKind::Literal("777777".into()),
+            span: Span {
+                start: Loc {
+                    pos: 13,
+                    line: 0,
+                    col: 13,
+                },
+                end: Loc {
+                    pos: 19,
+                    line: 0,
+                    col: 19,
+                },
+            },
+        },
+        Token {
+            typ: TokenKind::ParenClose,
+            span: Span {
+                start: Loc {
+                    pos: 19,
+                    line: 0,
+                    col: 19,
+                },
+                end: Loc {
+                    pos: 20,
+                    line: 0,
+                    col: 20,
+                },
+            },
+        },
+    ];
+
     println!("gotten:");
     print_tokens(&l.clone().unwrap());
     println!("expected");
