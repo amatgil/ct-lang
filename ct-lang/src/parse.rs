@@ -1,10 +1,7 @@
 use crate::ExprC;
 
-enum ParseErr {
-}
+enum ParseErr {}
 
 fn parse_expr(input: &str) -> Result<ExprC, ParseErr> {
     todo!()
 }
-
-

@@ -1,6 +1,6 @@
 mod interp;
-mod parse;
 mod lex;
+mod parse;
 
 use interp::*;
 use parse::*;

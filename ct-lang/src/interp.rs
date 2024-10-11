@@ -1,5 +1,5 @@
-use std::{collections::HashMap, fmt::Display};
 use itertools::izip;
+use std::{collections::HashMap, fmt::Display};
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 struct Symbol(String);
@@ -10,7 +10,7 @@ enum Type {
     Unit,
     Nat,
     Bool,
-    Fn
+    Fn,
 }
 
 /// TODO
@@ -24,7 +24,7 @@ impl Atom {
     fn type_of(&self) -> Type {
         match self {
             Self::Bool(_) => Type::Bool,
-            Self::Nat(_)  => Type::Nat,
+            Self::Nat(_) => Type::Nat,
         }
     }
 }
@@ -36,23 +36,20 @@ pub enum ExprC {
     /// An identifier, to be looked up in the environment
     Identifier(Symbol),
     /// A function call/application
-    FunCall {
-        f: Symbol,
-        args: Vec<ExprC>
-    },
+    FunCall { f: Symbol, args: Vec<ExprC> },
     /// A function definition, evaluates to the function it defines
     Deffun {
         name: Symbol,
         arg_types: Vec<Type>,
         arg_names: Vec<Symbol>,
         output_type: Type,
-        body: Box<ExprC>
+        body: Box<ExprC>,
     },
     /// Basic conditionals
     IfElse {
         clause: Box<ExprC>,
         truepath: Box<ExprC>,
-        falsepath: Box<ExprC>
+        falsepath: Box<ExprC>,
     },
 }
 
@@ -67,10 +64,9 @@ enum ÇValue {
     },
 }
 
-
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 struct Env {
-    bindings: HashMap<Symbol, ÇValue>
+    bindings: HashMap<Symbol, ÇValue>,
 }
 
 impl Env {
@@ -86,10 +82,7 @@ impl Env {
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum InterpErr {
     UnboundVariable(Symbol),
-    TypeMismatch {
-        expected: Type,
-        got: Type,
-    },
+    TypeMismatch { expected: Type, got: Type },
 }
 
 fn interp(expr: ExprC, mut env: Env) -> Result<(ÇValue, Env), InterpErr> {
@@ -99,11 +92,17 @@ fn interp(expr: ExprC, mut env: Env) -> Result<(ÇValue, Env), InterpErr> {
             let f = env.lookup(f.clone()).ok_or(InterpErr::UnboundVariable(f))?;
             match f {
                 // TODO: typecheck
-                ÇValue::Lambda { args: arg_types, body, output_type: _ } => {
+                ÇValue::Lambda {
+                    args: arg_types,
+                    body,
+                    output_type: _,
+                } => {
                     let og_env = env.clone();
                     let mut fn_env = env.clone();
 
-                    if arg_types.len() != args.len() { todo!("type error"); }
+                    if arg_types.len() != args.len() {
+                        todo!("type error");
+                    }
                     for (e, (s, _t)) in izip!(args, arg_types) {
                         let (v, _) = interp(e, og_env.clone())?;
                         fn_env = fn_env.add(s.clone(), v);
@@ -111,23 +110,44 @@ fn interp(expr: ExprC, mut env: Env) -> Result<(ÇValue, Env), InterpErr> {
                     }
                     dbg!(&fn_env);
                     dbg!(interp(body.clone(), fn_env))
-                },
-                ÇValue::Atom(a) => Err(InterpErr::TypeMismatch{ expected: Type::Fn, got: a.type_of() }),
-                ÇValue::Unit => Err(InterpErr::TypeMismatch{ expected: Type::Fn, got: Type::Unit }),
+                }
+                ÇValue::Atom(a) => Err(InterpErr::TypeMismatch {
+                    expected: Type::Fn,
+                    got: a.type_of(),
+                }),
+                ÇValue::Unit => Err(InterpErr::TypeMismatch {
+                    expected: Type::Fn,
+                    got: Type::Unit,
+                }),
             }
-        },
-        ExprC::Identifier(id) => Ok((env.lookup(id.clone()).ok_or(InterpErr::UnboundVariable(id))?.clone(), env)),
-        ExprC::Deffun { name, arg_types, arg_names, output_type, body } => {
+        }
+        ExprC::Identifier(id) => Ok((
+            env.lookup(id.clone())
+                .ok_or(InterpErr::UnboundVariable(id))?
+                .clone(),
+            env,
+        )),
+        ExprC::Deffun {
+            name,
+            arg_types,
+            arg_names,
+            output_type,
+            body,
+        } => {
             // TODO: type check
             let f = ÇValue::Lambda {
                 body: *body,
                 args: izip!(arg_names, arg_types).collect(),
-                output_type
+                output_type,
             };
             env = env.add(name, f);
             Ok((ÇValue::Unit, env))
-        },
-        ExprC::IfElse { clause, truepath, falsepath } => {
+        }
+        ExprC::IfElse {
+            clause,
+            truepath,
+            falsepath,
+        } => {
             let (p, new_env) = interp(*clause, env)?;
             if ÇValue::Atom(Atom::Bool(true)) == p {
                 interp(*truepath, new_env)
@@ -136,10 +156,9 @@ fn interp(expr: ExprC, mut env: Env) -> Result<(ÇValue, Env), InterpErr> {
             } else {
                 unreachable!("Internal type erorr: clause in `if`")
             }
-        },
+        }
     }
 }
-
 
 impl Display for Symbol {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -147,18 +166,21 @@ impl Display for Symbol {
     }
 }
 
-
 // ==== TESTS ====
 #[test]
 fn atoms() {
     let exprs = [
-        (ExprC::Atom(Atom::Bool(true)), ÇValue::Atom(Atom::Bool(true))),
-        (ExprC::Atom(Atom::Bool(false)), ÇValue::Atom(Atom::Bool(false))),
+        (
+            ExprC::Atom(Atom::Bool(true)),
+            ÇValue::Atom(Atom::Bool(true)),
+        ),
+        (
+            ExprC::Atom(Atom::Bool(false)),
+            ÇValue::Atom(Atom::Bool(false)),
+        ),
     ];
     for (e, v) in exprs {
-        assert_eq!(
-            interp(e, Env::default()).unwrap().0, v
-        )
+        assert_eq!(interp(e, Env::default()).unwrap().0, v)
     }
 }
 
@@ -174,7 +196,7 @@ fn fun_app() {
     let f = ÇValue::Lambda {
         args: vec![x, y],
         body: ExprC::Identifier(Symbol("x".into())),
-        output_type: Type::Nat, 
+        output_type: Type::Nat,
     };
     let mut env = Env::default();
     env = env.add(Symbol("f".into()), f);
@@ -184,10 +206,7 @@ fn fun_app() {
         args: vec![two, three],
     };
 
-    assert_eq!(
-        interp(e, env).unwrap().0,
-        ÇValue::Atom(Atom::Nat(2)),
-    )
+    assert_eq!(interp(e, env).unwrap().0, ÇValue::Atom(Atom::Nat(2)),)
 }
 
 #[test]
