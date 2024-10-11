@@ -4,6 +4,8 @@ The Lexer: turn the raw &str into a `Token` steam
 Good example: https://github.com/kaikalii/cube/blob/master/src/lex.rs
 */
 
+use std::fmt::Display;
+
 pub fn lex<'a>(input: &'a str) -> Result<Vec<Token<'a>>, LexError> {
     Lexer {
         input: input.trim(),
@@ -73,7 +75,7 @@ pub struct LexError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
 pub enum LexErrorKind {
     UnrecognizedToken(char),
-    FoundEOF,
+    UnexpectedEOF,
 }
 
 type TokensRes<'a> = Result<Vec<Token<'a>>, LexError>;
@@ -83,8 +85,8 @@ impl<'l> Lexer<'l> {
     /// If the predicate fails, None is returned
     fn advance_cursor_if(&mut self, f: impl Fn(char) -> bool) -> Result<Option<char>, LexError> {
         let c = self.input.chars().skip(self.loc.pos).next().ok_or(LexError {
-            span: Span { start: self.loc, end : self.loc},
-            kind: LexErrorKind::FoundEOF,
+            span: Span { start: self.loc, end: self.loc},
+            kind: LexErrorKind::UnexpectedEOF,
         })?;
         if f(c) {
             match c {
@@ -125,8 +127,14 @@ impl<'l> Lexer<'l> {
         while let (Some(c1), Some(c2)) = (text.next(), s.next()) {
             if c1 != c2 { return Ok(false) }
         }
+        let mut s = s.peekable();
 
-        if s.next().is_none() {
+        if text.next().is_none() && s.peek().is_some() {
+            Err(LexError {
+                span: Span { start: self.loc, end: self.loc },
+                kind: LexErrorKind::UnexpectedEOF,
+            })
+        } else if s.next().is_none() {
             self.advance_cursor_amount(n)?;
             Ok(true)
         } else {
@@ -135,7 +143,7 @@ impl<'l> Lexer<'l> {
             
     }
     fn can_continue(&self) -> bool {
-        self.loc.pos != self.input.len()
+        self.loc.pos < self.input.len()
     }
 
     fn next_char(&mut self) -> Result<Option<char>, LexError> {
@@ -147,16 +155,16 @@ impl<'l> Lexer<'l> {
 
         let mut tokens: Vec<Token<'l>> = Vec::new();
         loop {
-            let start = self.loc;
             if self.can_continue() {
-                let _ = self.advance_cursor_while(|x| " \t\n".contains(x));
+                let _ = self.advance_cursor_while(|c| " \t\n".contains(c));
+                let start = self.loc;
                 if let Some(c) = self.next_char()? {
                     tokens.push(match c {
                         '(' => with_span(TK::ParenOpen, start, self.loc),
                         ')' => with_span(TK::ParenClose, start, self.loc),
-                        '<' if self.next_chars_exact("-->")? => {
-                            with_span(TK::CommentStart, start, self.loc)
-                        },
+                        //'<' if self.next_chars_exact("-->")? => {
+                        //    with_span(TK::CommentStart, start, self.loc)
+                        //},
                         '<' if self.next_chars_exact("--")? => {
                             with_span(TK::CommentStart, start, self.loc)
                         },
@@ -197,6 +205,44 @@ impl Span {
         }
     }
 }
+
+fn print_tokens(ts: &[Token]) {
+    for t in ts {
+        println!("{t}");
+    }
+}
+
+impl Display for Token<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Token { typ, span } = self;
+        let s = match typ {
+            TokenKind::ParenOpen => "(",
+            TokenKind::ParenClose => ")",
+            TokenKind::CommentStart => "<--",
+            TokenKind::DoccommentStart => "<-->",
+            TokenKind::Identifier(x) => x,
+            TokenKind::Quote => "'",
+            TokenKind::DoubleQuote => "\"",
+            TokenKind::Deffun => "DEFFUN",
+            TokenKind::Literal(l) => &*l,
+        };
+
+        write!(f, "'{s}' {span}")
+    }
+}
+
+impl Display for Span {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}:{}]", self.start, self.end)
+    }
+}
+
+impl Display for Loc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}-{}-{}", self.pos, self.line, self.col)
+    }
+}
+
 
 #[test]
 fn paren_lex() {
@@ -305,6 +351,8 @@ fn comments_lex() {
             },
         },
     ];
+    print_tokens(&l.clone().unwrap());
+    print_tokens(&expected);
     assert_eq!(l.unwrap(), expected)
 }
 
@@ -394,5 +442,9 @@ fn whitespace() {
             },
         },
     ];
+    println!("gotten:");
+    print_tokens(&l.clone().unwrap());
+    println!("expected");
+    print_tokens(&expected);
     assert_eq!(l.unwrap(), expected)
 }

@@ -15,6 +15,7 @@ let
     heaptrack
     valgrind
     ffmpeg
+    gdb
   ];
 in
 pkgs.mkShell {
