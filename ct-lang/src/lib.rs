@@ -3,5 +3,5 @@ mod lex;
 mod parse;
 
 use interp::*;
-use parse::*;
 pub use lex::*;
+use parse::*;

@@ -84,10 +84,18 @@ impl<'l> Lexer<'l> {
     /// Advance if predicate, returning what is now behind the cursor
     /// If the predicate fails, None is returned
     fn advance_cursor_if(&mut self, f: impl Fn(char) -> bool) -> Result<Option<char>, LexError> {
-        let c = self.input.chars().skip(self.loc.pos).next().ok_or(LexError {
-            span: Span { start: self.loc, end: self.loc},
-            kind: LexErrorKind::UnexpectedEOF,
-        })?;
+        let c = self
+            .input
+            .chars()
+            .skip(self.loc.pos)
+            .next()
+            .ok_or(LexError {
+                span: Span {
+                    start: self.loc,
+                    end: self.loc,
+                },
+                kind: LexErrorKind::UnexpectedEOF,
+            })?;
         if f(c) {
             match c {
                 '\n' => {
@@ -111,7 +119,9 @@ impl<'l> Lexer<'l> {
         Ok(v)
     }
     fn advance_cursor_amount(&mut self, amount: usize) -> Result<(), LexError> {
-        for _ in 0..amount { self.next_char()?; };
+        for _ in 0..amount {
+            self.next_char()?;
+        }
         Ok(())
     }
 
@@ -120,28 +130,38 @@ impl<'l> Lexer<'l> {
     }
     /// Matches string. If there's a match, the cursor is advanced. If not, there are no side effects
     fn next_chars_exact(&mut self, s: &str) -> Result<bool, LexError> {
+        dbg!(&self, s);
         let n = s.len();
-        let mut text = self.input.chars().skip(self.loc.pos);
-        let mut s = s.chars();
+        let mut text = self.input.chars().skip(self.loc.pos).peekable();
+        let mut s = s.chars().peekable();
 
-        while let (Some(c1), Some(c2)) = (text.next(), s.next()) {
-            if c1 != c2 { return Ok(false) }
+        while let (Some(c1), Some(c2)) = (text.peek(), s.peek()) {
+            dbg!(c1, c2);
+            if c1 != c2 {
+                return Ok(false);
+            }
+
+            s.next();
+            text.next();
         }
-        let mut s = s.peekable();
 
-        if text.next().is_none() && s.peek().is_some() {
-            Err(LexError {
-                span: Span { start: self.loc, end: self.loc },
+        dbg!(&text, &s);
+        match (text.peek(), s.peek()) {
+            (Some(_), Some(_)) => unreachable!("while above will not exist while this occurs"),
+            (_, None) => {
+                self.advance_cursor_amount(n)?;
+                Ok(true)
+            }
+            (None, Some(_)) => Err(LexError {
+                span: Span {
+                    start: self.loc,
+                    end: self.loc,
+                },
                 kind: LexErrorKind::UnexpectedEOF,
-            })
-        } else if s.next().is_none() {
-            self.advance_cursor_amount(n)?;
-            Ok(true)
-        } else {
-            Ok(false)
+            }),
         }
-            
     }
+
     fn can_continue(&self) -> bool {
         self.loc.pos < self.input.len()
     }
@@ -162,12 +182,12 @@ impl<'l> Lexer<'l> {
                     tokens.push(match c {
                         '(' => with_span(TK::ParenOpen, start, self.loc),
                         ')' => with_span(TK::ParenClose, start, self.loc),
-                        //'<' if self.next_chars_exact("-->")? => {
-                        //    with_span(TK::CommentStart, start, self.loc)
-                        //},
-                        '<' if self.next_chars_exact("--")? => {
+                        '<' if dbg!(self.next_chars_exact("-->")) == Ok(true) => {
                             with_span(TK::CommentStart, start, self.loc)
-                        },
+                        }
+                        '<' if dbg!(self.next_chars_exact("--")) == Ok(true) => {
+                            with_span(TK::CommentStart, start, self.loc)
+                        }
                         _ => {
                             return Err(LexError {
                                 kind: LexErrorKind::UnrecognizedToken(c),
@@ -242,7 +262,6 @@ impl Display for Loc {
         write!(f, "{}-{}-{}", self.pos, self.line, self.col)
     }
 }
-
 
 #[test]
 fn paren_lex() {
