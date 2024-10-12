@@ -65,13 +65,13 @@ struct Span {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
 pub struct Token<'a> {
-    typ: TokenKind<'a>,
-    span: Span,
+    pub typ: TokenKind<'a>,
+    pub span: Span,
 }
 
 // TODO
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-enum TokenKind<'a> {
+pub enum TokenKind<'a> {
     /// `(`
     ParenOpen,
     /// `)`
@@ -155,6 +155,10 @@ impl<'l> Lexer<'l> {
         }
         Ok(v)
     }
+    fn advance_cursor_until(&mut self, f: impl Fn(char) -> bool) -> Result<(), LexError> {
+        self.advance_cursor_while(|c| !f(c))?;
+        Ok(())
+    }
     fn advance_cursor_amount(&mut self, amount: usize) -> Result<(), LexError> {
         for _ in 0..amount {
             self.next_char()?;
@@ -210,14 +214,16 @@ impl<'l> Lexer<'l> {
                 let _ = self.advance_cursor_while(|c| WHITESPACE.contains(&c));
                 let start = self.loc;
                 if let (prev_loc, Some(c)) = self.next_char()? {
-                    dbg!(c);
+                    dbg!(c, start);
                     let (t, l) = match c {
                         '(' => (with_span(TK::ParenOpen, start, self.loc), self),
                         ')' => (with_span(TK::ParenClose, start, self.loc), self),
                         '<' if self.next_chars_exact("-->") == Ok(true) => {
+                            self.advance_cursor_until(|c| c == '\n')?;
                             (with_span(TK::CommentStart, start, self.loc), self)
                         }
                         '<' if self.next_chars_exact("--") == Ok(true) => {
+                            self.advance_cursor_until(|c| c == '\n')?;
                             (with_span(TK::CommentStart, start, self.loc), self)
                         }
                         '\'' => (with_span(TK::Quote, start, self.loc), self),
@@ -271,11 +277,10 @@ impl<'l> Lexer<'l> {
             .skip(start.pos)
             .position(|c| !LEGAL_IDENT_CHARS.contains(&c))
         {
-            Some(i) => dbg!(i),
+            Some(i) => i,
             None => self.input.len() - start.pos,
         };
 
-        dbg!(start, ident_len);
         let end_loc = Loc {
             pos: start.pos + ident_len,
             line: self.loc.line,
@@ -345,16 +350,9 @@ impl Span {
     }
 }
 
-fn print_tokens(ts: &[Token]) {
-    for t in ts {
-        println!("{t}");
-    }
-}
-
-impl Display for Token<'_> {
+impl Display for TokenKind<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Token { typ, span } = self;
-        let s = match typ {
+        let s = match self {
             TokenKind::ParenOpen => "(",
             TokenKind::ParenClose => ")",
             TokenKind::CommentStart => "<--",
@@ -364,10 +362,17 @@ impl Display for Token<'_> {
             TokenKind::DoubleQuote => "\"",
             TokenKind::Deffun => "DEFFUN",
             TokenKind::Deftype => "DEFTYPE",
+            TokenKind::Deftest => "DEFTEST",
+            TokenKind::Let => "LET",
             TokenKind::Literal(l) => &*l,
         };
-
-        write!(f, "'{s}' {span}")
+        write!(f, "{s}")
+    }
+}
+impl Display for Token<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Token { typ, span } = self;
+        write!(f, "'{typ}' {span}")
     }
 }
 
