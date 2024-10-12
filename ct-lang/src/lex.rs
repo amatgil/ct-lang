@@ -17,7 +17,7 @@ const LEGAL_IDENT_CHARS: [char; 26*2 + 9 + 8 + 10] = [
 
 const WHITESPACE: [char; 3] = [' ', '\t', '\n'];
 
-const _CHECK_DISJOINTNESS_BETWEEN_LEGAL_IDENT_CHARS_AND_WHITSPACE: () = {
+const _CHECK_DISJOINTNESS_BETWEEN_LEGAL_IDENT_CHARS_AND_WHITESPACE: () = {
     let mut w_i = 0;
     while w_i < WHITESPACE.len() {
         let mut id_i = 0;
@@ -36,6 +36,7 @@ const _ASSERT_WHITESPACE_CONTAINS_NEWLINE: () = {
     let mut found_newline = false;
     while w_i < WHITESPACE.len() && !found_newline {
         if WHITESPACE[w_i] == '\n' { found_newline = true }
+        w_i += 1;
     }
 
     if !found_newline { panic!("comptime check failed: WHITESPACE must contain '\n'"); }
@@ -44,7 +45,7 @@ const _ASSERT_WHITESPACE_CONTAINS_NEWLINE: () = {
 
 pub fn lex<'a>(input: &'a str) -> Result<Vec<Token<'a>>, LexError> {
     Lexer {
-        input: input.trim(),
+        input,
         loc: Loc {
             line: 0,
             col: 0,
@@ -88,7 +89,7 @@ pub enum TokenKind<'a> {
     /// `)`
     ParenClose,
     /// `<--`
-    CommentStart(&'a str),
+    LineComment(&'a str),
     /// `<-->`
     DoccommentStart(&'a str),
     /// Any identifier. Cannot start with a digit
@@ -118,6 +119,7 @@ pub struct LexError {
 pub enum LexErrorKind {
     UnrecognizedToken(char),
     UnexpectedEOF,
+    MissingNewlineAtEndOfFile
 }
 
 type TokensRes<'a> = Result<Vec<Token<'a>>, LexError>;
@@ -159,16 +161,17 @@ impl<'l> Lexer<'l> {
             Ok((prev, None))
         }
     }
-    fn advance_cursor_while(&mut self, f: impl Fn(char) -> bool) -> Result<Vec<char>, LexError> {
-        let mut v = vec![];
-        while let (_, Some(c)) = self.advance_cursor_if(&f)? {
-            v.push(c)
+    /// Returns how much the cursor advanced
+    fn advance_cursor_while(&mut self, f: impl Fn(char) -> bool) -> Result<usize, LexError> {
+        let mut n = 0;
+        while let (_, Some(_c)) = self.advance_cursor_if(&f)? {
+            n += 1;
         }
-        Ok(v)
+        Ok(n)
     }
-    fn advance_cursor_until(&mut self, f: impl Fn(char) -> bool) -> Result<(), LexError> {
-        self.advance_cursor_while(|c| !f(c))?;
-        Ok(())
+    fn advance_cursor_until(&mut self, f: impl Fn(char) -> bool) -> Result<usize, LexError> {
+        Ok(self.advance_cursor_while(|c| !f(c))?)
+        
     }
     fn advance_cursor_amount(&mut self, amount: usize) -> Result<(), LexError> {
         for _ in 0..amount {
@@ -218,11 +221,23 @@ impl<'l> Lexer<'l> {
 
     fn run(mut self) -> Result<Vec<Token<'l>>, LexError> {
         use TokenKind as TK;
+        if Some(false) == self.input.chars().last().map(|c| c == '\n') {
+            println!("{} is not newline (is '{}')", self.input, self.input.chars().last().unwrap());
+            let loc = Loc {
+                pos: todo!(),
+                line: todo!(),
+                col: todo!(),
+            };
+            return Err(LexError {
+                span: Span { start: loc, end: loc },
+                kind: LexErrorKind::MissingNewlineAtEndOfFile,
+            });
+        }
 
         let mut tokens: Vec<Token<'_>> = Vec::new();
         loop {
+            let _ = self.advance_cursor_while(|c| WHITESPACE.contains(&c));
             if self.can_continue() {
-                let _ = self.advance_cursor_while(|c| WHITESPACE.contains(&c));
                 let start = self.loc;
                 if let (prev_loc, Some(c)) = self.next_char()? {
                     dbg!(c, start);
@@ -230,17 +245,21 @@ impl<'l> Lexer<'l> {
                         '(' => (with_span(TK::ParenOpen, start, self.loc), self),
                         ')' => (with_span(TK::ParenClose, start, self.loc), self),
                         '<' if self.next_chars_exact("-->") == Ok(true) => {
-                            self.advance_cursor_until(|c| c == '\n')?;
-                            (with_span(TK::CommentStart, start, self.loc), self)
+                            let comm_start = self.loc.pos; // Save before getting the text
+                            let delta = self.advance_cursor_until(|c| c == '\n')?;
+
+                            (with_span(TK::DoccommentStart(
+                                &self.input[comm_start..comm_start+delta]), start, self.loc), self)
                         }
                         '<' if self.next_chars_exact("--") == Ok(true) => {
-                            self.advance_cursor_until(|c| c == '\n')?;
-                            (with_span(TK::CommentStart, start, self.loc), self)
+                            let comm_start = self.loc.pos; // Save before getting the text
+                            let delta = self.advance_cursor_until(|c| c == '\n')?;
+
+                            (with_span(TK::LineComment(
+                                &self.input[comm_start..comm_start+delta]), start, self.loc), self)
                         }
                         '\'' => (with_span(TK::Quote, start, self.loc), self),
-                        // Digit
                         x if x.is_digit(10) => self.lex_number(prev_loc),
-                        // Identifier
                         _ => {
                             let (probable_ident, l) = self.lex_identifier(prev_loc);
                             let Token {
@@ -317,9 +336,9 @@ impl<'l> Lexer<'l> {
         let cs = &self.input[start.pos..start.pos + final_i];
 
         let end_loc = Loc {
-            pos: self.loc.pos + cs.len(),
-            line: self.loc.line,
-            col: self.loc.col + cs.len(),
+            pos: start.pos + cs.len(),
+            line: start.line,
+            col: start.col + cs.len(),
         };
 
         (
@@ -357,18 +376,18 @@ impl Span {
 impl Display for TokenKind<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
-            TokenKind::ParenOpen => "(",
-            TokenKind::ParenClose => ")",
-            TokenKind::CommentStart(s) => &*format!("<-- [{s}]"),
-            TokenKind::DoccommentStart(s) => &*format!("<--> [{s}]"),
-            TokenKind::Identifier(x) => x,
-            TokenKind::Quote => "'",
-            TokenKind::DoubleQuote => "\"",
-            TokenKind::Deffun => "DEFFUN",
-            TokenKind::Deftype => "DEFTYPE",
-            TokenKind::Deftest => "DEFTEST",
-            TokenKind::Let => "LET",
-            TokenKind::Literal(l) => &*l,
+            TokenKind::ParenOpen => "(".to_string(),
+            TokenKind::ParenClose => ")".to_string(),
+            TokenKind::LineComment(c) => format!("<-- [{}]", c),
+            TokenKind::DoccommentStart(c) => format!("<--> [{}]", c),
+            TokenKind::Identifier(x) => x.to_string(),
+            TokenKind::Quote => "'".to_string(),
+            TokenKind::DoubleQuote => "\"".to_string(),
+            TokenKind::Deffun => "DEFFUN".to_string(),
+            TokenKind::Deftype => "DEFTYPE".to_string(),
+            TokenKind::Deftest => "DEFTEST".to_string(),
+            TokenKind::Let => "LET".to_string(),
+            TokenKind::Literal(l) => l.to_string(),
         };
         write!(f, "{s}")
     }
@@ -407,7 +426,8 @@ impl Display for Loc {
 
 #[test]
 fn paren_lex() {
-    let input = "((()";
+    let input = "((()
+";
     let l = lex(input);
 
     let expected = vec![
@@ -477,12 +497,14 @@ fn paren_lex() {
 
 #[test]
 fn comments_lex() {
-    let input = "<-- <--";
+    let input = "<-- comment here
+<-- haii
+";
     let l = lex(input);
 
     let expected = vec![
         Token {
-            typ: TokenKind::CommentStart,
+            typ: TokenKind::LineComment(" comment here"),
             span: Span {
                 start: Loc {
                     pos: 0,
@@ -490,40 +512,49 @@ fn comments_lex() {
                     col: 0,
                 },
                 end: Loc {
-                    pos: 3,
+                    pos: 16,
                     line: 0,
-                    col: 3,
+                    col: 16,
                 },
             },
         },
         Token {
-            typ: TokenKind::CommentStart,
+            typ: TokenKind::LineComment(" haii"),
             span: Span {
                 start: Loc {
-                    pos: 4,
-                    line: 0,
-                    col: 4,
+                    pos: 17,
+                    line: 1,
+                    col: 0,
                 },
                 end: Loc {
-                    pos: 7,
-                    line: 0,
-                    col: 7,
+                    pos: 25,
+                    line: 1,
+                    col: 8,
                 },
             },
         },
     ];
+    println!("Gotten:");
     print_tokens(&l.clone().unwrap());
+    println!("Expected:");
     print_tokens(&expected);
     assert_eq!(l.unwrap(), expected)
+}
+
+fn print_tokens(ts: &[Token]) {
+    for t in ts {
+        println!("{t}");
+    }
 }
 
 #[test]
 fn whitespace() {
     use TokenKind::*; // bad form, but it's a short test
     let input = "((
-<--
 )
-)";
+)
+";
+    dbg!(input);
     let l = lex(input);
 
     let expected = vec![
@@ -558,7 +589,7 @@ fn whitespace() {
             },
         },
         Token {
-            typ: CommentStart,
+            typ: ParenClose,
             span: Span {
                 start: Loc {
                     pos: 3,
@@ -566,23 +597,8 @@ fn whitespace() {
                     col: 0,
                 },
                 end: Loc {
-                    pos: 6,
+                    pos: 4,
                     line: 1,
-                    col: 3,
-                },
-            },
-        },
-        Token {
-            typ: ParenClose,
-            span: Span {
-                start: Loc {
-                    pos: 7,
-                    line: 2,
-                    col: 0,
-                },
-                end: Loc {
-                    pos: 8,
-                    line: 2,
                     col: 1,
                 },
             },
@@ -591,13 +607,13 @@ fn whitespace() {
             typ: ParenClose,
             span: Span {
                 start: Loc {
-                    pos: 9,
-                    line: 3,
+                    pos: 5,
+                    line: 2,
                     col: 0,
                 },
                 end: Loc {
-                    pos: 10,
-                    line: 3,
+                    pos: 6,
+                    line: 2,
                     col: 1,
                 },
             },
@@ -612,7 +628,8 @@ fn whitespace() {
 
 #[test]
 fn numeric() {
-    let input = "(1 3 78 1231 543212)";
+    let input = "(1 3 78 1231 543212)
+";
     let l = lex(input);
 
     let expected = vec![
@@ -731,7 +748,8 @@ fn numeric() {
 }
 #[test]
 fn list() {
-    let input = "(concat '(1 2) '(3 4 5))";
+    let input = "(concat '(1 2) '(3 4 5))
+";
     let l = lex(input);
 
     let expected = vec![
