@@ -242,7 +242,7 @@ impl<'l> Lexer<'l> {
         let ident_len = match self.input
             .chars()
             .skip(start.pos)
-            .position(|c| WHITESPACE.contains(&c)) {
+            .position(|c| !LEGAL_IDENT_CHARS.contains(&c)) {
                 Some(i) => dbg!(i),
                 None => self.input.len() - start.pos
             };
