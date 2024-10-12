@@ -86,6 +86,27 @@ pub struct Loc {
     pub col: usize,
 }
 
+impl Loc {
+    /// Calculates all fields of `Loc` from a position. If this position is
+    /// greater than input.len(), it returns the description of the last character
+    fn from_pos(input: &str, pos: usize) -> Self {
+        let mut newlines_seen = 0;
+        let mut last_newline_pos = None;
+        for (i, c) in input.chars().enumerate().take(pos) {
+            if c == '\n' {
+                newlines_seen += 1;
+                last_newline_pos = Some(i);
+            }
+        }
+
+        Loc {
+            pos,
+            line: newlines_seen,
+            col: pos - last_newline_pos.unwrap_or_default(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 /// Section of the code: [start, end)
 struct Span {
@@ -250,11 +271,7 @@ impl<'l> Lexer<'l> {
                 self.input,
                 self.input.chars().last().unwrap()
             );
-            let loc = Loc {
-                pos: todo!(),
-                line: todo!(),
-                col: todo!(),
-            };
+            let loc = Loc::from_pos(self.input, self.input.len());
             return Err(LexError {
                 span: Span {
                     start: loc,
@@ -441,6 +458,7 @@ impl Display for ReservedKeyword {
             ReservedKeyword::Let => "let",
             ReservedKeyword::True => "#t",
             ReservedKeyword::False => "#f",
+            ReservedKeyword::If => "if",
         };
         write!(f, "{s}")
     }
@@ -549,9 +567,7 @@ fn paren_lex() {
 
 #[test]
 fn comments_lex() {
-    let input = "<-- comment here
-<-- haii
-";
+    let input = "<-- comment here\n<-- haii\n";
     let l = lex(input);
 
     let expected = vec![
@@ -602,10 +618,7 @@ fn print_tokens(ts: &[Token]) {
 #[test]
 fn whitespace() {
     use TokenKind::*; // bad form, but it's a short test
-    let input = "((
-)
-)
-";
+    let input = "((\n)\n)\n";
     dbg!(input);
     let l = lex(input);
 
@@ -680,8 +693,7 @@ fn whitespace() {
 
 #[test]
 fn numeric() {
-    let input = "(1 3 78 1231 543212)
-";
+    let input = "(1 3 78 1231 543212)\n";
     let l = lex(input);
 
     let expected = vec![
@@ -800,8 +812,7 @@ fn numeric() {
 }
 #[test]
 fn list() {
-    let input = "(concat '(1 2) '(3 4 5))
-";
+    let input = "(concat '(1 2) '(3 4 5))\n";
     let l = lex(input);
 
     let expected = vec![
@@ -1014,6 +1025,63 @@ fn list() {
                     col: 24,
                 },
             },
+        },
+    ];
+
+    println!("GOTTEN:");
+    print_tokens(&l.clone().unwrap());
+    println!("\nEXPECTED:");
+    print_tokens(&expected);
+    assert_eq!(l.unwrap(), expected)
+}
+
+#[test]
+fn conditional() {
+    let input = "(if #t 2 3)\n";
+    let l = lex(input);
+
+    let expected = vec![
+        Token {
+            typ: TokenKind::ParenOpen,
+            span: Span {
+                start: Loc::from_pos(input, 0),
+                end: Loc::from_pos(input, 1),
+            }
+        },
+        Token {
+            typ: TokenKind::Reserved(ReservedKeyword::If),
+            span: Span {
+                start: Loc::from_pos(input, 1),
+                end: Loc::from_pos(input, 3),
+            }
+        },
+        Token {
+            typ: TokenKind::Reserved(ReservedKeyword::True),
+            span: Span {
+                start: Loc::from_pos(input, 4),
+                end: Loc::from_pos(input, 6),
+            }
+        },
+        Token {
+            typ: TokenKind::Literal("2"),
+            span: Span {
+                start: Loc::from_pos(input, 7),
+                end: Loc::from_pos(input, 8),
+            }
+        },
+        Token {
+            typ: TokenKind::Literal("3"),
+            span: Span {
+                start: Loc::from_pos(input, 9),
+                end: Loc::from_pos(input, 10),
+            }
+        },
+        Token {
+            typ: TokenKind::ParenClose,
+            span: Span {
+                start: Loc::from_pos(input, 10),
+                end: Loc::from_pos(input, 11),
+            }
         },
     ];
 
