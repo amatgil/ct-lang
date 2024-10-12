@@ -23,12 +23,23 @@ const _CHECK_DISJOINTNESS_BETWEEN_LEGAL_IDENT_CHARS_AND_WHITSPACE: () = {
         let mut id_i = 0;
         while id_i < LEGAL_IDENT_CHARS.len() {
             if WHITESPACE[w_i] == LEGAL_IDENT_CHARS[id_i] {
-                panic!("There's a char that's in both WHITESPACE and LEGAL_IDENT_CHARS")
+                panic!("comptime check failed: There's a char that's in both WHITESPACE and LEGAL_IDENT_CHARS")
             };
             id_i += 1;
         }
         w_i += 1;
     }
+};
+
+const _ASSERT_WHITESPACE_CONTAINS_NEWLINE: () = {
+    let mut w_i = 0;
+    let mut found_newline = false;
+    while w_i < WHITESPACE.len() && !found_newline {
+        if WHITESPACE[w_i] == '\n' { found_newline = true }
+    }
+
+    if !found_newline { panic!("comptime check failed: WHITESPACE must contain '\n'"); }
+
 };
 
 pub fn lex<'a>(input: &'a str) -> Result<Vec<Token<'a>>, LexError> {
@@ -77,9 +88,9 @@ pub enum TokenKind<'a> {
     /// `)`
     ParenClose,
     /// `<--`
-    CommentStart,
+    CommentStart(&'a str),
     /// `<-->`
-    DoccommentStart,
+    DoccommentStart(&'a str),
     /// Any identifier. Cannot start with a digit
     Identifier(&'a str),
     /// `'`
@@ -95,7 +106,7 @@ pub enum TokenKind<'a> {
     /// `let` or `LET`
     Let,
     /// Any value that evaluates to itself (number, string, etc)
-    Literal(String),
+    Literal(&'a str),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
@@ -228,7 +239,7 @@ impl<'l> Lexer<'l> {
                         }
                         '\'' => (with_span(TK::Quote, start, self.loc), self),
                         // Digit
-                        x if x.is_digit(10) => self.lex_number(start, x),
+                        x if x.is_digit(10) => self.lex_number(prev_loc),
                         // Identifier
                         _ => {
                             let (probable_ident, l) = self.lex_identifier(prev_loc);
@@ -300,22 +311,15 @@ impl<'l> Lexer<'l> {
             },
         )
     }
-    fn lex_number(self, start: Loc, first_char: char) -> (Token<'l>, Self) {
-        let cs = iter::once(first_char)
-            .chain(
-                self.input
-                    .chars()
-                    .skip(self.loc.pos)
-                    .take_while(|&c| char::is_digit(c, 10)),
-            )
-            .collect::<String>();
+    fn lex_number(self, start: Loc) -> (Token<'l>, Self) {
+        // Cannot fail: there's at least one char
+        let final_i = self.input.chars().skip(start.pos).position(|c| !char::is_digit(c, 10)).unwrap();
+        let cs = &self.input[start.pos..start.pos + final_i];
 
-        let n = cs.len();
         let end_loc = Loc {
-            // - 1 because we already too `c`
-            pos: self.loc.pos + n - 1,
+            pos: self.loc.pos + cs.len(),
             line: self.loc.line,
-            col: self.loc.col + n - 1,
+            col: self.loc.col + cs.len(),
         };
 
         (
@@ -355,8 +359,8 @@ impl Display for TokenKind<'_> {
         let s = match self {
             TokenKind::ParenOpen => "(",
             TokenKind::ParenClose => ")",
-            TokenKind::CommentStart => "<--",
-            TokenKind::DoccommentStart => "<-->",
+            TokenKind::CommentStart(s) => &*format!("<-- [{s}]"),
+            TokenKind::DoccommentStart(s) => &*format!("<--> [{s}]"),
             TokenKind::Identifier(x) => x,
             TokenKind::Quote => "'",
             TokenKind::DoubleQuote => "\"",
