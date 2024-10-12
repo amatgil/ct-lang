@@ -213,31 +213,24 @@ impl<'l> Lexer<'l> {
                             (with_span(TK::CommentStart, start, self.loc), self)
                         }
                         '\'' => (with_span(TK::Quote, start, self.loc), self),
+                        // Digit
                         x if x.is_digit(10) => self.lex_number(start, x),
-                        'd' if self.next_chars_exact("effun") == Ok(true) => {
-                            (with_span(TK::Deffun, start, self.loc), self)
-                        }
-                        'D' if self.next_chars_exact("EFFUN") == Ok(true) => {
-                            (with_span(TK::Deffun, start, self.loc), self)
-                        }
-                        'd' if self.next_chars_exact("eftype") == Ok(true) => {
-                            (with_span(TK::Deffun, start, self.loc), self)
-                        }
-                        'D' if self.next_chars_exact("EFTYPE") == Ok(true) => {
-                            (with_span(TK::Deffun, start, self.loc), self)
-                        }
-                        _ => self.lex_identifier(prev_loc)
-                        /*
+                        // Identifier
                         _ => {
-                            return Err(LexError {
-                                kind: LexErrorKind::UnrecognizedToken(c),
-                                span: Span {
-                                    start,
-                                    end: self.loc,
-                                },
-                            })
+                            let (probable_ident, l) = self.lex_identifier(prev_loc);
+                            let Token { typ: TokenKind::Identifier(ident), span } = probable_ident.clone() else { unreachable!("lex_identifier returns identifiers") };
+                            match ident {
+                                "deffun" | "DEFFUN" => (Token {
+                                    typ: TokenKind::Deffun,
+                                    span,
+                                }, l),
+                                "deftype" | "DEFTYPE" => (Token {
+                                    typ: TokenKind::Deftype,
+                                    span,
+                                }, l),
+                                _ => (probable_ident, l)
+                            }
                         }
-                        */
                     };
                     self = l;
                     tokens.push(t);
