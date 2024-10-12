@@ -16,6 +16,19 @@ const LEGAL_IDENT_CHARS: [char; 26*2 + 9 + 8 + 10] = [
 
 const WHITESPACE: [char; 3] = [' ', '\t', '\n'];
 
+const _CHECK_DISJOINTNESS_BETWEEN_LEGAL_IDENT_CHARS_AND_WHITSPACE: () = {
+    let mut w_i = 0;
+    while w_i < WHITESPACE.len() {
+        let mut id_i = 0;
+        while id_i < LEGAL_IDENT_CHARS.len() {
+            if WHITESPACE[w_i] == LEGAL_IDENT_CHARS[id_i] { panic!("There's a char that's in both WHITESPACE and LEGAL_IDENT_CHARS") };
+            id_i += 1;
+        }
+        w_i += 1;
+    }
+
+};
+
 
 pub fn lex<'a>(input: &'a str) -> Result<Vec<Token<'a>>, LexError> {
     Lexer {
