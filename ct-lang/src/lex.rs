@@ -174,8 +174,9 @@ impl<'l> Lexer<'l> {
         loop {
             if self.can_continue() {
                 let _ = self.advance_cursor_while(|c| " \t\n".contains(c));
-                let start = dbg!(self.loc);
+                let start = self.loc;
                 if let Some(c) = self.next_char()? {
+                    dbg!(c);
                     let (t, l) = match c {
                         '(' => (with_span(TK::ParenOpen, start, self.loc), self),
                         ')' => (with_span(TK::ParenClose, start, self.loc), self),
@@ -186,7 +187,13 @@ impl<'l> Lexer<'l> {
                             (with_span(TK::CommentStart, start, self.loc), self)
                         }
                         '\'' => (with_span(TK::Quote, start, self.loc), self),
-                        c if c.is_digit(10) => self.lex_number(start, c),
+                        x if x.is_digit(10) => self.lex_number(start, x),
+                        'd' if self.next_chars_exact("effun") == Ok(true) => {
+                            (with_span(TK::Deffun, start, self.loc), self)
+                        }
+                        'D' if self.next_chars_exact("EFFUN") == Ok(true) => {
+                            (with_span(TK::Deffun, start, self.loc), self)
+                        }
                         _ => {
                             return Err(LexError {
                                 kind: LexErrorKind::UnrecognizedToken(c),
@@ -211,32 +218,35 @@ impl<'l> Lexer<'l> {
     }
     fn lex_number(self, start: Loc, first_char: char) -> (Token<'l>, Self) {
         let cs = iter::once(first_char)
-            .chain(self
-                   .input
-                   .chars()
-                   .skip(self.loc.pos)
-                   .inspect(|x| { dbg!(&x); } )
-                   .take_while(|&c| char::is_digit(c, 10)))
+            .chain(
+                self.input
+                    .chars()
+                    .skip(self.loc.pos)
+                    .take_while(|&c| char::is_digit(c, 10)),
+            )
             .collect::<String>();
 
         let n = cs.len();
         let end_loc = Loc {
-            pos: self.loc.pos + n,
+            // - 1 because we already too `c`
+            pos: self.loc.pos + n - 1,
             line: self.loc.line,
-            col: self.loc.col + n,
+            col: self.loc.col + n - 1,
         };
 
-        (Token {
-            typ: TokenKind::Literal(cs),
-            span: Span {
-                start,
-                end: end_loc,
+        (
+            Token {
+                typ: TokenKind::Literal(cs),
+                span: Span {
+                    start,
+                    end: end_loc,
+                },
             },
-        },
-         Self {
-             input: self.input,
-             loc: end_loc,
-         })
+            Self {
+                input: self.input,
+                loc: end_loc,
+            },
+        )
     }
 }
 
@@ -500,7 +510,7 @@ fn whitespace() {
 
 #[test]
 fn numeric() {
-    let input = "(1 3 78 1231 777777)";
+    let input = "(1 3 78 1231 543212)";
     let l = lex(input);
 
     let expected = vec![
@@ -580,7 +590,7 @@ fn numeric() {
             },
         },
         Token {
-            typ: TokenKind::Literal("777777".into()),
+            typ: TokenKind::Literal("543212".into()),
             span: Span {
                 start: Loc {
                     pos: 13,
