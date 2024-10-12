@@ -6,6 +6,14 @@ Good example: https://github.com/kaikalii/cube/blob/master/src/lex.rs
 
 use std::{fmt::Display, iter};
 
+const LEGAL_IDENT_CHARS: [char; 26*2 + 9 + 8] = [
+    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+    '=', '?', '-', '_', '+', '-', '*', 
+];
+
+
 pub fn lex<'a>(input: &'a str) -> Result<Vec<Token<'a>>, LexError> {
     Lexer {
         input: input.trim(),
