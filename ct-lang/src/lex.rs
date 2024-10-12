@@ -4,20 +4,21 @@ The Lexer: turn the raw &str into a `Token` steam
 Good example: https://github.com/kaikalii/cube/blob/master/src/lex.rs
 */
 
-use std::{fmt::Display, iter};
+use std::{collections::HashMap, fmt::Display};
 
 #[rustfmt::skip]
-const LEGAL_IDENT_CHARS: [char; 26*2 + 9 + 8 + 10] = [
+const LEGAL_IDENT_CHARS: [char; 26*2 + 10*2 + 8] = [
     'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-    '=', '?', '-', '_', '+', '-', '*', 
     '₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉',
+    '=', '?', '-', '_', '+', '-', '*', '#',
 ];
 
 const WHITESPACE: [char; 3] = [' ', '\t', '\n'];
 
-const _CHECK_DISJOINTNESS_BETWEEN_LEGAL_IDENT_CHARS_AND_WHITESPACE: () = {
+/// Assert that no character is both whitespace and part of a legal identifier
+const _ASSERT_DISJOINTNESS_BETWEEN_LEGAL_IDENT_CHARS_AND_WHITESPACE: () = {
     let mut w_i = 0;
     while w_i < WHITESPACE.len() {
         let mut id_i = 0;
@@ -31,6 +32,7 @@ const _CHECK_DISJOINTNESS_BETWEEN_LEGAL_IDENT_CHARS_AND_WHITESPACE: () = {
     }
 };
 
+/// Assert that WHITESPACE contains a newline (needed for the lexer to function)
 const _ASSERT_WHITESPACE_CONTAINS_NEWLINE: () = {
     let mut w_i = 0;
     let mut found_newline = false;
@@ -45,6 +47,19 @@ const _ASSERT_WHITESPACE_CONTAINS_NEWLINE: () = {
         panic!("comptime check failed: WHITESPACE must contain '\n'");
     }
 };
+
+lazy_static::lazy_static! {
+    /// Map of reserved keywords from their string representations
+    static ref RESERVED_KEYWORDS: HashMap<&'static str, ReservedKeyword> = HashMap::from([
+        ("#t", ReservedKeyword::True),
+        ("#f", ReservedKeyword::False),
+        ("deffun", ReservedKeyword::Deffun),
+        ("deftype", ReservedKeyword::Deftype),
+        ("deftest", ReservedKeyword::Deftest),
+        ("let", ReservedKeyword::Let),
+        ("if", ReservedKeyword::If)
+    ]);
+}
 
 pub fn lex<'a>(input: &'a str) -> Result<Vec<Token<'a>>, LexError> {
     Lexer {
@@ -101,16 +116,22 @@ pub enum TokenKind<'a> {
     Quote,
     /// `"`
     DoubleQuote,
-    /// `deffun` or `DEFFUN`
-    Deffun,
-    /// `deftype` or `DEFTYPE`
-    Deftype,
-    /// `deftest` or `DEFTEST`
-    Deftest,
-    /// `let` or `LET`
-    Let,
+    /// Any ReservedKeyword
+    Reserved(ReservedKeyword),
     /// Any value that evaluates to itself (number, string, etc)
     Literal(&'a str),
+}
+
+/// All possible reserved keywords (for their string representation, see RESERVED_KEYWORDS
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
+pub enum ReservedKeyword {
+    Deffun,
+    Deftype,
+    Deftest,
+    Let,
+    True,
+    False,
+    If,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
@@ -292,22 +313,16 @@ impl<'l> Lexer<'l> {
                             else {
                                 unreachable!("lex_identifier returns identifiers")
                             };
-                            match ident {
-                                "deffun" | "DEFFUN" => (
+                            if let Some(keyword) = RESERVED_KEYWORDS.get(ident) {
+                                (
                                     Token {
-                                        typ: TokenKind::Deffun,
+                                        typ: TokenKind::Reserved(*keyword),
                                         span,
                                     },
                                     l,
-                                ),
-                                "deftype" | "DEFTYPE" => (
-                                    Token {
-                                        typ: TokenKind::Deftype,
-                                        span,
-                                    },
-                                    l,
-                                ),
-                                _ => (probable_ident, l),
+                                )
+                            } else {
+                                (probable_ident, l)
                             }
                         }
                     };
@@ -411,11 +426,21 @@ impl Display for TokenKind<'_> {
             TokenKind::Identifier(x) => x.to_string(),
             TokenKind::Quote => "'".to_string(),
             TokenKind::DoubleQuote => "\"".to_string(),
-            TokenKind::Deffun => "DEFFUN".to_string(),
-            TokenKind::Deftype => "DEFTYPE".to_string(),
-            TokenKind::Deftest => "DEFTEST".to_string(),
-            TokenKind::Let => "LET".to_string(),
+            TokenKind::Reserved(k) => k.to_string(),
             TokenKind::Literal(l) => l.to_string(),
+        };
+        write!(f, "{s}")
+    }
+}
+impl Display for ReservedKeyword {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            ReservedKeyword::Deffun => "deffun",
+            ReservedKeyword::Deftype => "deftype",
+            ReservedKeyword::Deftest => "deftest",
+            ReservedKeyword::Let => "let",
+            ReservedKeyword::True => "#t",
+            ReservedKeyword::False => "#f",
         };
         write!(f, "{s}")
     }
