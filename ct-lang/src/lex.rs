@@ -35,12 +35,15 @@ const _ASSERT_WHITESPACE_CONTAINS_NEWLINE: () = {
     let mut w_i = 0;
     let mut found_newline = false;
     while w_i < WHITESPACE.len() && !found_newline {
-        if WHITESPACE[w_i] == '\n' { found_newline = true }
+        if WHITESPACE[w_i] == '\n' {
+            found_newline = true
+        }
         w_i += 1;
     }
 
-    if !found_newline { panic!("comptime check failed: WHITESPACE must contain '\n'"); }
-
+    if !found_newline {
+        panic!("comptime check failed: WHITESPACE must contain '\n'");
+    }
 };
 
 pub fn lex<'a>(input: &'a str) -> Result<Vec<Token<'a>>, LexError> {
@@ -119,7 +122,7 @@ pub struct LexError {
 pub enum LexErrorKind {
     UnrecognizedToken(char),
     UnexpectedEOF,
-    MissingNewlineAtEndOfFile
+    MissingNewlineAtEndOfFile,
 }
 
 type TokensRes<'a> = Result<Vec<Token<'a>>, LexError>;
@@ -171,7 +174,6 @@ impl<'l> Lexer<'l> {
     }
     fn advance_cursor_until(&mut self, f: impl Fn(char) -> bool) -> Result<usize, LexError> {
         Ok(self.advance_cursor_while(|c| !f(c))?)
-        
     }
     fn advance_cursor_amount(&mut self, amount: usize) -> Result<(), LexError> {
         for _ in 0..amount {
@@ -222,14 +224,21 @@ impl<'l> Lexer<'l> {
     fn run(mut self) -> Result<Vec<Token<'l>>, LexError> {
         use TokenKind as TK;
         if Some(false) == self.input.chars().last().map(|c| c == '\n') {
-            println!("{} is not newline (is '{}')", self.input, self.input.chars().last().unwrap());
+            println!(
+                "{} is not newline (is '{}')",
+                self.input,
+                self.input.chars().last().unwrap()
+            );
             let loc = Loc {
                 pos: todo!(),
                 line: todo!(),
                 col: todo!(),
             };
             return Err(LexError {
-                span: Span { start: loc, end: loc },
+                span: Span {
+                    start: loc,
+                    end: loc,
+                },
                 kind: LexErrorKind::MissingNewlineAtEndOfFile,
             });
         }
@@ -248,15 +257,29 @@ impl<'l> Lexer<'l> {
                             let comm_start = self.loc.pos; // Save before getting the text
                             let delta = self.advance_cursor_until(|c| c == '\n')?;
 
-                            (with_span(TK::DoccommentStart(
-                                &self.input[comm_start..comm_start+delta]), start, self.loc), self)
+                            (
+                                with_span(
+                                    TK::DoccommentStart(
+                                        &self.input[comm_start..comm_start + delta],
+                                    ),
+                                    start,
+                                    self.loc,
+                                ),
+                                self,
+                            )
                         }
                         '<' if self.next_chars_exact("--") == Ok(true) => {
                             let comm_start = self.loc.pos; // Save before getting the text
                             let delta = self.advance_cursor_until(|c| c == '\n')?;
 
-                            (with_span(TK::LineComment(
-                                &self.input[comm_start..comm_start+delta]), start, self.loc), self)
+                            (
+                                with_span(
+                                    TK::LineComment(&self.input[comm_start..comm_start + delta]),
+                                    start,
+                                    self.loc,
+                                ),
+                                self,
+                            )
                         }
                         '\'' => (with_span(TK::Quote, start, self.loc), self),
                         x if x.is_digit(10) => self.lex_number(prev_loc),
@@ -332,7 +355,12 @@ impl<'l> Lexer<'l> {
     }
     fn lex_number(self, start: Loc) -> (Token<'l>, Self) {
         // Cannot fail: there's at least one char
-        let final_i = self.input.chars().skip(start.pos).position(|c| !char::is_digit(c, 10)).unwrap();
+        let final_i = self
+            .input
+            .chars()
+            .skip(start.pos)
+            .position(|c| !char::is_digit(c, 10))
+            .unwrap();
         let cs = &self.input[start.pos..start.pos + final_i];
 
         let end_loc = Loc {
@@ -410,7 +438,6 @@ impl Display for Loc {
         write!(f, "{}-{}-{}", self.pos, self.line, self.col)
     }
 }
-
 
 // =================================
 // =================================
