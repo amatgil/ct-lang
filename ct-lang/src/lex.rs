@@ -6,12 +6,15 @@ Good example: https://github.com/kaikalii/cube/blob/master/src/lex.rs
 
 use std::{fmt::Display, iter};
 
-const LEGAL_IDENT_CHARS: [char; 26*2 + 9 + 8] = [
+const LEGAL_IDENT_CHARS: [char; 26*2 + 9 + 8 + 10] = [
     'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
     '=', '?', '-', '_', '+', '-', '*', 
+    '₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉',
 ];
+
+const WHITESPACE: [char; 3] = [' ', '\t', '\n'];
 
 
 pub fn lex<'a>(input: &'a str) -> Result<Vec<Token<'a>>, LexError> {
@@ -63,7 +66,7 @@ enum TokenKind<'a> {
     CommentStart,
     /// `<-->`
     DoccommentStart,
-    /// Any identifier
+    /// Any identifier. Cannot start with a digit
     Identifier(&'a str),
     /// `'`
     Quote,
@@ -71,6 +74,8 @@ enum TokenKind<'a> {
     DoubleQuote,
     /// `deffun` or `DEFFUN`
     Deffun,
+    /// `deftype` or `DEFTYPE`
+    Deftype,
     /// Any value that evaluates to itself (number, string, etc)
     Literal(String),
 }
@@ -91,7 +96,7 @@ type TokensRes<'a> = Result<Vec<Token<'a>>, LexError>;
 impl<'l> Lexer<'l> {
     /// Advance if predicate, returning what is now behind the cursor
     /// If the predicate fails, None is returned
-    fn advance_cursor_if(&mut self, f: impl Fn(char) -> bool) -> Result<Option<char>, LexError> {
+    fn advance_cursor_if(&mut self, f: impl Fn(char) -> bool) -> Result<(Loc, Option<char>), LexError> {
         let c = self
             .input
             .chars()
@@ -104,6 +109,9 @@ impl<'l> Lexer<'l> {
                 },
                 kind: LexErrorKind::UnexpectedEOF,
             })?;
+
+        let prev = self.loc;
+
         if f(c) {
             match c {
                 '\n' => {
@@ -114,14 +122,14 @@ impl<'l> Lexer<'l> {
                 _ => self.loc.col += 1,
             }
             self.loc.pos += 1;
-            Ok(Some(c))
+            Ok((prev, Some(c)))
         } else {
-            Ok(None)
+            Ok((prev, None))
         }
     }
     fn advance_cursor_while(&mut self, f: impl Fn(char) -> bool) -> Result<Vec<char>, LexError> {
         let mut v = vec![];
-        while let Some(c) = self.advance_cursor_if(&f)? {
+        while let (_, Some(c)) = self.advance_cursor_if(&f)? {
             v.push(c)
         }
         Ok(v)
@@ -133,9 +141,6 @@ impl<'l> Lexer<'l> {
         Ok(())
     }
 
-    fn next_char_exact(&mut self, c: char) -> Result<bool, LexError> {
-        Ok(self.advance_cursor_if(|c2| c == c2)?.is_some())
-    }
     /// Matches string. If there's a match, the cursor is advanced. If not, there are no side effects
     fn next_chars_exact(&mut self, s: &str) -> Result<bool, LexError> {
         let n = s.len();
@@ -171,7 +176,7 @@ impl<'l> Lexer<'l> {
         self.loc.pos < self.input.len()
     }
 
-    fn next_char(&mut self) -> Result<Option<char>, LexError> {
+    fn next_char(&mut self) -> Result<(Loc, Option<char>), LexError> {
         self.advance_cursor_if(|_| true)
     }
 
@@ -181,9 +186,9 @@ impl<'l> Lexer<'l> {
         let mut tokens: Vec<Token<'_>> = Vec::new();
         loop {
             if self.can_continue() {
-                let _ = self.advance_cursor_while(|c| " \t\n".contains(c));
+                let _ = self.advance_cursor_while(|c| WHITESPACE.contains(&c));
                 let start = self.loc;
-                if let Some(c) = self.next_char()? {
+                if let (prev_loc, Some(c)) = self.next_char()? {
                     dbg!(c);
                     let (t, l) = match c {
                         '(' => (with_span(TK::ParenOpen, start, self.loc), self),
@@ -202,6 +207,14 @@ impl<'l> Lexer<'l> {
                         'D' if self.next_chars_exact("EFFUN") == Ok(true) => {
                             (with_span(TK::Deffun, start, self.loc), self)
                         }
+                        'd' if self.next_chars_exact("eftype") == Ok(true) => {
+                            (with_span(TK::Deffun, start, self.loc), self)
+                        }
+                        'D' if self.next_chars_exact("EFTYPE") == Ok(true) => {
+                            (with_span(TK::Deffun, start, self.loc), self)
+                        }
+                        _ => self.lex_identifier(prev_loc)
+                        /*
                         _ => {
                             return Err(LexError {
                                 kind: LexErrorKind::UnrecognizedToken(c),
@@ -211,6 +224,7 @@ impl<'l> Lexer<'l> {
                                 },
                             })
                         }
+                        */
                     };
                     self = l;
                     tokens.push(t);
@@ -223,6 +237,34 @@ impl<'l> Lexer<'l> {
         }
 
         Ok(tokens)
+    }
+    fn lex_identifier(self, start: Loc) -> (Token<'l>, Self) {
+        let ident_len = match self.input
+            .chars()
+            .skip(start.pos)
+            .position(|c| WHITESPACE.contains(&c)) {
+                Some(i) => dbg!(i),
+                None => self.input.len() - start.pos
+            };
+
+        dbg!(start, ident_len);
+        let end_loc = Loc {
+            pos: start.pos + ident_len,
+            line: self.loc.line,
+            col: start.pos + ident_len,
+        };
+        (Token {
+                typ: TokenKind::Identifier(&self.input[start.pos..start.pos + ident_len]),
+                span: Span {
+                    start,
+                    end: end_loc,
+                },
+            },
+            Self {
+                input: self.input,
+                loc: end_loc,
+            },
+        )
     }
     fn lex_number(self, start: Loc, first_char: char) -> (Token<'l>, Self) {
         let cs = iter::once(first_char)
@@ -292,6 +334,7 @@ impl Display for Token<'_> {
             TokenKind::Quote => "'",
             TokenKind::DoubleQuote => "\"",
             TokenKind::Deffun => "DEFFUN",
+            TokenKind::Deftype => "DEFTYPE",
             TokenKind::Literal(l) => &*l,
         };
 
@@ -632,6 +675,230 @@ fn numeric() {
     println!("gotten:");
     print_tokens(&l.clone().unwrap());
     println!("expected");
+    print_tokens(&expected);
+    assert_eq!(l.unwrap(), expected)
+}
+#[test]
+fn list() {
+    let input = "(concat '(1 2) '(3 4 5))";
+    let l = lex(input);
+
+    let expected = vec![
+        Token {
+            typ: TokenKind::ParenOpen,
+            span: Span {
+                start: Loc {
+                    pos: 0,
+                    line: 0,
+                    col: 0,
+                },
+                end: Loc {
+                    pos: 1,
+                    line: 0,
+                    col: 1,
+                },
+            },
+        },
+        Token {
+            typ: TokenKind::Identifier("concat".into()),
+            span: Span {
+                start: Loc {
+                    pos: 1,
+                    line: 0,
+                    col: 1,
+                },
+                end: Loc {
+                    pos: 7,
+                    line: 0,
+                    col: 7,
+                },
+            },
+        },
+        Token {
+            typ: TokenKind::Quote,
+            span: Span {
+                start: Loc {
+                    pos: 8,
+                    line: 0,
+                    col: 8,
+                },
+                end: Loc {
+                    pos: 9,
+                    line: 0,
+                    col: 9,
+                },
+            },
+        },
+        Token {
+            typ: TokenKind::ParenOpen,
+            span: Span {
+                start: Loc {
+                    pos: 9,
+                    line: 0,
+                    col: 9,
+                },
+                end: Loc {
+                    pos: 10,
+                    line: 0,
+                    col: 10,
+                },
+            },
+        },
+        Token {
+            typ: TokenKind::Literal("1".into()),
+            span: Span {
+                start: Loc {
+                    pos: 10,
+                    line: 0,
+                    col: 10,
+                },
+                end: Loc {
+                    pos: 11,
+                    line: 0,
+                    col: 11,
+                },
+            },
+        },
+        Token {
+            typ: TokenKind::Literal("2".into()),
+            span: Span {
+                start: Loc {
+                    pos: 12,
+                    line: 0,
+                    col: 12,
+                },
+                end: Loc {
+                    pos: 13,
+                    line: 0,
+                    col: 13,
+                },
+            },
+        },
+        Token {
+            typ: TokenKind::ParenClose,
+            span: Span {
+                start: Loc {
+                    pos: 13,
+                    line: 0,
+                    col: 13,
+                },
+                end: Loc {
+                    pos: 14,
+                    line: 0,
+                    col: 14,
+                },
+            },
+        },
+        Token {
+            typ: TokenKind::Quote,
+            span: Span {
+                start: Loc {
+                    pos: 15,
+                    line: 0,
+                    col: 15,
+                },
+                end: Loc {
+                    pos: 16,
+                    line: 0,
+                    col: 16,
+                },
+            },
+        },
+        Token {
+            typ: TokenKind::ParenOpen,
+            span: Span {
+                start: Loc {
+                    pos: 16,
+                    line: 0,
+                    col: 16,
+                },
+                end: Loc {
+                    pos: 17,
+                    line: 0,
+                    col: 17,
+                },
+            },
+        },
+        Token {
+            typ: TokenKind::Literal("3".into()),
+            span: Span {
+                start: Loc {
+                    pos: 17,
+                    line: 0,
+                    col: 17,
+                },
+                end: Loc {
+                    pos: 18,
+                    line: 0,
+                    col: 18,
+                },
+            },
+        },
+        Token {
+            typ: TokenKind::Literal("4".into()),
+            span: Span {
+                start: Loc {
+                    pos: 19,
+                    line: 0,
+                    col: 19,
+                },
+                end: Loc {
+                    pos: 20,
+                    line: 0,
+                    col: 20,
+                },
+            },
+        },
+        Token {
+            typ: TokenKind::Literal("5".into()),
+            span: Span {
+                start: Loc {
+                    pos: 21,
+                    line: 0,
+                    col: 21,
+                },
+                end: Loc {
+                    pos: 22,
+                    line: 0,
+                    col: 22,
+                },
+            },
+        },
+        Token {
+            typ: TokenKind::ParenClose,
+            span: Span {
+                start: Loc {
+                    pos: 22,
+                    line: 0,
+                    col: 22,
+                },
+                end: Loc {
+                    pos: 23,
+                    line: 0,
+                    col: 23,
+                },
+            },
+        },
+        Token {
+            typ: TokenKind::ParenClose,
+            span: Span {
+                start: Loc {
+                    pos: 23,
+                    line: 0,
+                    col: 23,
+                },
+                end: Loc {
+                    pos: 24,
+                    line: 0,
+                    col: 24,
+                },
+            },
+        },
+    ];
+
+    println!("GOTTEN:");
+    print_tokens(&l.clone().unwrap());
+    println!("\nEXPECTED:");
     print_tokens(&expected);
     assert_eq!(l.unwrap(), expected)
 }
