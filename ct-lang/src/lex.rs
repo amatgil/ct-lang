@@ -6,6 +6,7 @@ Good example: https://github.com/kaikalii/cube/blob/master/src/lex.rs
 
 use std::{fmt::Display, iter};
 
+#[rustfmt::skip]
 const LEGAL_IDENT_CHARS: [char; 26*2 + 9 + 8 + 10] = [
     'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
@@ -21,14 +22,14 @@ const _CHECK_DISJOINTNESS_BETWEEN_LEGAL_IDENT_CHARS_AND_WHITSPACE: () = {
     while w_i < WHITESPACE.len() {
         let mut id_i = 0;
         while id_i < LEGAL_IDENT_CHARS.len() {
-            if WHITESPACE[w_i] == LEGAL_IDENT_CHARS[id_i] { panic!("There's a char that's in both WHITESPACE and LEGAL_IDENT_CHARS") };
+            if WHITESPACE[w_i] == LEGAL_IDENT_CHARS[id_i] {
+                panic!("There's a char that's in both WHITESPACE and LEGAL_IDENT_CHARS")
+            };
             id_i += 1;
         }
         w_i += 1;
     }
-
 };
-
 
 pub fn lex<'a>(input: &'a str) -> Result<Vec<Token<'a>>, LexError> {
     Lexer {
@@ -109,7 +110,10 @@ type TokensRes<'a> = Result<Vec<Token<'a>>, LexError>;
 impl<'l> Lexer<'l> {
     /// Advance if predicate, returning what is now behind the cursor
     /// If the predicate fails, None is returned
-    fn advance_cursor_if(&mut self, f: impl Fn(char) -> bool) -> Result<(Loc, Option<char>), LexError> {
+    fn advance_cursor_if(
+        &mut self,
+        f: impl Fn(char) -> bool,
+    ) -> Result<(Loc, Option<char>), LexError> {
         let c = self
             .input
             .chars()
@@ -218,17 +222,29 @@ impl<'l> Lexer<'l> {
                         // Identifier
                         _ => {
                             let (probable_ident, l) = self.lex_identifier(prev_loc);
-                            let Token { typ: TokenKind::Identifier(ident), span } = probable_ident.clone() else { unreachable!("lex_identifier returns identifiers") };
+                            let Token {
+                                typ: TokenKind::Identifier(ident),
+                                span,
+                            } = probable_ident.clone()
+                            else {
+                                unreachable!("lex_identifier returns identifiers")
+                            };
                             match ident {
-                                "deffun" | "DEFFUN" => (Token {
-                                    typ: TokenKind::Deffun,
-                                    span,
-                                }, l),
-                                "deftype" | "DEFTYPE" => (Token {
-                                    typ: TokenKind::Deftype,
-                                    span,
-                                }, l),
-                                _ => (probable_ident, l)
+                                "deffun" | "DEFFUN" => (
+                                    Token {
+                                        typ: TokenKind::Deffun,
+                                        span,
+                                    },
+                                    l,
+                                ),
+                                "deftype" | "DEFTYPE" => (
+                                    Token {
+                                        typ: TokenKind::Deftype,
+                                        span,
+                                    },
+                                    l,
+                                ),
+                                _ => (probable_ident, l),
                             }
                         }
                     };
@@ -245,13 +261,15 @@ impl<'l> Lexer<'l> {
         Ok(tokens)
     }
     fn lex_identifier(self, start: Loc) -> (Token<'l>, Self) {
-        let ident_len = match self.input
+        let ident_len = match self
+            .input
             .chars()
             .skip(start.pos)
-            .position(|c| !LEGAL_IDENT_CHARS.contains(&c)) {
-                Some(i) => dbg!(i),
-                None => self.input.len() - start.pos
-            };
+            .position(|c| !LEGAL_IDENT_CHARS.contains(&c))
+        {
+            Some(i) => dbg!(i),
+            None => self.input.len() - start.pos,
+        };
 
         dbg!(start, ident_len);
         let end_loc = Loc {
@@ -259,7 +277,8 @@ impl<'l> Lexer<'l> {
             line: self.loc.line,
             col: start.pos + ident_len,
         };
-        (Token {
+        (
+            Token {
                 typ: TokenKind::Identifier(&self.input[start.pos..start.pos + ident_len]),
                 span: Span {
                     start,
