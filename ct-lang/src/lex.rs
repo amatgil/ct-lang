@@ -90,6 +90,10 @@ enum TokenKind<'a> {
     Deffun,
     /// `deftype` or `DEFTYPE`
     Deftype,
+    /// `deftest` or `DEFTEST`
+    Deftest,
+    /// `let` or `LET`
+    Let,
     /// Any value that evaluates to itself (number, string, etc)
     Literal(String),
 }
