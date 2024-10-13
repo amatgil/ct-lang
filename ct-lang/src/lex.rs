@@ -7,12 +7,12 @@ Good example: https://github.com/kaikalii/cube/blob/master/src/lex.rs
 use std::{collections::HashMap, fmt::Display};
 
 #[rustfmt::skip]
-const LEGAL_IDENT_CHARS: [char; 26*2 + 10*2 + 8] = [
+const LEGAL_IDENT_CHARS: [char; 26*2 + 10*2 + 10] = [
     'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
     '₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉',
-    '=', '?', '-', '_', '+', '-', '*', '#',
+    '<', '=', '>', '?', '-', '_', '+', '-', '*', '#',
 ];
 
 const WHITESPACE: [char; 3] = [' ', '\t', '\n'];
@@ -109,9 +109,18 @@ impl Loc {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 /// Section of the code: [start, end)
-struct Span {
-    start: Loc,
-    end: Loc,
+pub struct Span {
+    pub start: Loc,
+    pub end: Loc,
+}
+
+impl Span {
+    fn from_poss(input: &str, a: usize, b: usize) -> Self {
+        Span {
+            start: Loc::from_pos(input, a),
+            end: Loc::from_pos(input, b),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
@@ -287,7 +296,6 @@ impl<'l> Lexer<'l> {
             if self.can_continue() {
                 let start = self.loc;
                 if let (prev_loc, Some(c)) = self.next_char()? {
-                    dbg!(c, start);
                     let (t, l) = match c {
                         '(' => (with_span(TK::ParenOpen, start, self.loc), self),
                         ')' => (with_span(TK::ParenClose, start, self.loc), self),
@@ -321,7 +329,7 @@ impl<'l> Lexer<'l> {
                         }
                         '\'' => (with_span(TK::Quote, start, self.loc), self),
                         x if x.is_digit(10) => self.lex_number(prev_loc),
-                        _ => {
+                        c if LEGAL_IDENT_CHARS.contains(&c) => {
                             let (probable_ident, l) = self.lex_identifier(prev_loc);
                             let Token {
                                 typ: TokenKind::Identifier(ident),
@@ -342,6 +350,15 @@ impl<'l> Lexer<'l> {
                                 (probable_ident, l)
                             }
                         }
+                        what => {
+                            return Err(LexError {
+                                span: Span {
+                                    start,
+                                    end: self.loc,
+                                },
+                                kind: LexErrorKind::UnrecognizedToken(what),
+                            });
+                        }
                     };
                     self = l;
                     tokens.push(t);
@@ -356,20 +373,23 @@ impl<'l> Lexer<'l> {
         Ok(tokens)
     }
     fn lex_identifier(self, start: Loc) -> (Token<'l>, Self) {
-        let ident_len = match self
+        let (ident_len, _) = self
             .input
             .chars()
             .skip(start.pos)
-            .position(|c| !LEGAL_IDENT_CHARS.contains(&c))
-        {
-            Some(i) => i,
-            None => self.input.len() - start.pos,
-        };
+            .enumerate()
+            .skip_while(|(_, c)| LEGAL_IDENT_CHARS.contains(&c))
+            .next()
+            .unwrap();
+
+        if ident_len == 0 {
+            unreachable!("Identifier len cannot be zero")
+        }
 
         let end_loc = Loc {
             pos: start.pos + ident_len,
             line: self.loc.line,
-            col: start.pos + ident_len,
+            col: start.col + ident_len,
         };
         (
             Token {
@@ -619,7 +639,6 @@ fn print_tokens(ts: &[Token]) {
 fn whitespace() {
     use TokenKind::*; // bad form, but it's a short test
     let input = "((\n)\n)\n";
-    dbg!(input);
     let l = lex(input);
 
     let expected = vec![
@@ -1046,42 +1065,528 @@ fn conditional() {
             span: Span {
                 start: Loc::from_pos(input, 0),
                 end: Loc::from_pos(input, 1),
-            }
+            },
         },
         Token {
             typ: TokenKind::Reserved(ReservedKeyword::If),
             span: Span {
                 start: Loc::from_pos(input, 1),
                 end: Loc::from_pos(input, 3),
-            }
+            },
         },
         Token {
             typ: TokenKind::Reserved(ReservedKeyword::True),
             span: Span {
                 start: Loc::from_pos(input, 4),
                 end: Loc::from_pos(input, 6),
-            }
+            },
         },
         Token {
             typ: TokenKind::Literal("2"),
             span: Span {
                 start: Loc::from_pos(input, 7),
                 end: Loc::from_pos(input, 8),
-            }
+            },
         },
         Token {
             typ: TokenKind::Literal("3"),
             span: Span {
                 start: Loc::from_pos(input, 9),
                 end: Loc::from_pos(input, 10),
-            }
+            },
         },
         Token {
             typ: TokenKind::ParenClose,
             span: Span {
                 start: Loc::from_pos(input, 10),
                 end: Loc::from_pos(input, 11),
-            }
+            },
+        },
+    ];
+
+    println!("GOTTEN:");
+    print_tokens(&l.clone().unwrap());
+    println!("\nEXPECTED:");
+    print_tokens(&expected);
+    assert_eq!(l.unwrap(), expected)
+}
+
+#[test]
+fn factorial() {
+    use ReservedKeyword::*;
+    use TokenKind::*;
+    let input = "(deffun fact
+  (Nat Nat)
+  (n)
+  (if (<=? 1) 1 (* n (fact (- x 1)))))
+";
+    let l = lex(input);
+
+    let expected = vec![
+        Token {
+            typ: ParenOpen,
+            span: Span {
+                start: Loc {
+                    pos: 0,
+                    line: 0,
+                    col: 0,
+                },
+                end: Loc {
+                    pos: 1,
+                    line: 0,
+                    col: 1,
+                },
+            },
+        },
+        Token {
+            typ: Reserved(Deffun),
+            span: Span {
+                start: Loc {
+                    pos: 1,
+                    line: 0,
+                    col: 1,
+                },
+                end: Loc {
+                    pos: 7,
+                    line: 0,
+                    col: 7,
+                },
+            },
+        },
+        Token {
+            typ: Identifier("fact"),
+            span: Span {
+                start: Loc {
+                    pos: 8,
+                    line: 0,
+                    col: 8,
+                },
+                end: Loc {
+                    pos: 12,
+                    line: 0,
+                    col: 12,
+                },
+            },
+        },
+        Token {
+            typ: ParenOpen,
+            span: Span {
+                start: Loc {
+                    pos: 15,
+                    line: 1,
+                    col: 2,
+                },
+                end: Loc {
+                    pos: 16,
+                    line: 1,
+                    col: 3,
+                },
+            },
+        },
+        Token {
+            typ: Identifier("Nat"),
+            span: Span {
+                start: Loc {
+                    pos: 16,
+                    line: 1,
+                    col: 3,
+                },
+                end: Loc {
+                    pos: 19,
+                    line: 1,
+                    col: 6,
+                },
+            },
+        },
+        Token {
+            typ: Identifier("Nat"),
+            span: Span {
+                start: Loc {
+                    pos: 20,
+                    line: 1,
+                    col: 7,
+                },
+                end: Loc {
+                    pos: 23,
+                    line: 1,
+                    col: 10,
+                },
+            },
+        },
+        Token {
+            typ: ParenClose,
+            span: Span {
+                start: Loc {
+                    pos: 23,
+                    line: 1,
+                    col: 10,
+                },
+                end: Loc {
+                    pos: 24,
+                    line: 1,
+                    col: 11,
+                },
+            },
+        },
+        Token {
+            typ: ParenOpen,
+            span: Span {
+                start: Loc {
+                    pos: 27,
+                    line: 2,
+                    col: 2,
+                },
+                end: Loc {
+                    pos: 28,
+                    line: 2,
+                    col: 3,
+                },
+            },
+        },
+        Token {
+            typ: Identifier("n"),
+            span: Span {
+                start: Loc {
+                    pos: 28,
+                    line: 2,
+                    col: 3,
+                },
+                end: Loc {
+                    pos: 29,
+                    line: 2,
+                    col: 4,
+                },
+            },
+        },
+        Token {
+            typ: ParenClose,
+            span: Span {
+                start: Loc {
+                    pos: 29,
+                    line: 2,
+                    col: 4,
+                },
+                end: Loc {
+                    pos: 30,
+                    line: 2,
+                    col: 5,
+                },
+            },
+        },
+        Token {
+            typ: ParenOpen,
+            span: Span {
+                start: Loc {
+                    pos: 33,
+                    line: 3,
+                    col: 2,
+                },
+                end: Loc {
+                    pos: 34,
+                    line: 3,
+                    col: 3,
+                },
+            },
+        },
+        Token {
+            typ: Reserved(If),
+            span: Span {
+                start: Loc {
+                    pos: 34,
+                    line: 3,
+                    col: 3,
+                },
+                end: Loc {
+                    pos: 36,
+                    line: 3,
+                    col: 5,
+                },
+            },
+        },
+        Token {
+            typ: ParenOpen,
+            span: Span {
+                start: Loc {
+                    pos: 37,
+                    line: 3,
+                    col: 6,
+                },
+                end: Loc {
+                    pos: 38,
+                    line: 3,
+                    col: 7,
+                },
+            },
+        },
+        Token {
+            typ: Identifier("<=?"),
+            span: Span {
+                start: Loc {
+                    pos: 38,
+                    line: 3,
+                    col: 7,
+                },
+                end: Loc {
+                    pos: 41,
+                    line: 3,
+                    col: 10,
+                },
+            },
+        },
+        Token {
+            typ: Literal("1"),
+            span: Span {
+                start: Loc {
+                    pos: 42,
+                    line: 3,
+                    col: 11,
+                },
+                end: Loc {
+                    pos: 43,
+                    line: 3,
+                    col: 12,
+                },
+            },
+        },
+        Token {
+            typ: ParenClose,
+            span: Span {
+                start: Loc {
+                    pos: 43,
+                    line: 3,
+                    col: 12,
+                },
+                end: Loc {
+                    pos: 44,
+                    line: 3,
+                    col: 13,
+                },
+            },
+        },
+        Token {
+            typ: Literal("1"),
+            span: Span {
+                start: Loc {
+                    pos: 45,
+                    line: 3,
+                    col: 14,
+                },
+                end: Loc {
+                    pos: 46,
+                    line: 3,
+                    col: 15,
+                },
+            },
+        },
+        Token {
+            typ: ParenOpen,
+            span: Span {
+                start: Loc {
+                    pos: 47,
+                    line: 3,
+                    col: 16,
+                },
+                end: Loc {
+                    pos: 48,
+                    line: 3,
+                    col: 17,
+                },
+            },
+        },
+        Token {
+            typ: Identifier("*"),
+            span: Span {
+                start: Loc {
+                    pos: 48,
+                    line: 3,
+                    col: 17,
+                },
+                end: Loc {
+                    pos: 49,
+                    line: 3,
+                    col: 18,
+                },
+            },
+        },
+        Token {
+            typ: Identifier("n"),
+            span: Span {
+                start: Loc {
+                    pos: 50,
+                    line: 3,
+                    col: 19,
+                },
+                end: Loc {
+                    pos: 51,
+                    line: 3,
+                    col: 20,
+                },
+            },
+        },
+        Token {
+            typ: ParenOpen,
+            span: Span {
+                start: Loc {
+                    pos: 52,
+                    line: 3,
+                    col: 21,
+                },
+                end: Loc {
+                    pos: 53,
+                    line: 3,
+                    col: 22,
+                },
+            },
+        },
+        Token {
+            typ: Identifier("fact"),
+            span: Span {
+                start: Loc {
+                    pos: 53,
+                    line: 3,
+                    col: 22,
+                },
+                end: Loc {
+                    pos: 57,
+                    line: 3,
+                    col: 26,
+                },
+            },
+        },
+        Token {
+            typ: ParenOpen,
+            span: Span {
+                start: Loc {
+                    pos: 58,
+                    line: 3,
+                    col: 27,
+                },
+                end: Loc {
+                    pos: 59,
+                    line: 3,
+                    col: 28,
+                },
+            },
+        },
+        Token {
+            typ: Identifier("-"),
+            span: Span {
+                start: Loc {
+                    pos: 59,
+                    line: 3,
+                    col: 28,
+                },
+                end: Loc {
+                    pos: 60,
+                    line: 3,
+                    col: 29,
+                },
+            },
+        },
+        Token {
+            typ: Identifier("x"),
+            span: Span {
+                start: Loc {
+                    pos: 61,
+                    line: 3,
+                    col: 30,
+                },
+                end: Loc {
+                    pos: 62,
+                    line: 3,
+                    col: 31,
+                },
+            },
+        },
+        Token {
+            typ: Literal("1"),
+            span: Span {
+                start: Loc {
+                    pos: 63,
+                    line: 3,
+                    col: 32,
+                },
+                end: Loc {
+                    pos: 64,
+                    line: 3,
+                    col: 33,
+                },
+            },
+        },
+        Token {
+            typ: ParenClose,
+            span: Span {
+                start: Loc {
+                    pos: 64,
+                    line: 3,
+                    col: 33,
+                },
+                end: Loc {
+                    pos: 65,
+                    line: 3,
+                    col: 34,
+                },
+            },
+        },
+        Token {
+            typ: ParenClose,
+            span: Span {
+                start: Loc {
+                    pos: 65,
+                    line: 3,
+                    col: 34,
+                },
+                end: Loc {
+                    pos: 66,
+                    line: 3,
+                    col: 35,
+                },
+            },
+        },
+        Token {
+            typ: ParenClose,
+            span: Span {
+                start: Loc {
+                    pos: 66,
+                    line: 3,
+                    col: 35,
+                },
+                end: Loc {
+                    pos: 67,
+                    line: 3,
+                    col: 36,
+                },
+            },
+        },
+        Token {
+            typ: ParenClose,
+            span: Span {
+                start: Loc {
+                    pos: 67,
+                    line: 3,
+                    col: 36,
+                },
+                end: Loc {
+                    pos: 68,
+                    line: 3,
+                    col: 37,
+                },
+            },
+        },
+        Token {
+            typ: ParenClose,
+            span: Span {
+                start: Loc {
+                    pos: 68,
+                    line: 3,
+                    col: 37,
+                },
+                end: Loc {
+                    pos: 69,
+                    line: 3,
+                    col: 38,
+                },
+            },
         },
     ];
 
