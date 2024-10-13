@@ -28,12 +28,25 @@ pub fn display_error_at_token(s: Span, source: &str, help_text: &str) {
         col: s.end.col + right_delta,
     };
 
+
+    //    xxxxHIGHLIGHTxxxxx
+    //    ^   ^       ^    ^
+    //    a   b       c    d
+
+    // TODO: don't unwrap
+    let a = source.char_indices().map(|(i, _)| i).nth(extend_left.pos).unwrap();
+    let b = source.char_indices().map(|(i, _)| i).nth(s.start.pos).unwrap();
+    let c = source.char_indices().map(|(i, _)| i).nth(s.end.pos).unwrap();
+    let d = source.char_indices().map(|(i, _)| i).nth(extend_right.pos).unwrap();
+
     println!();
 
-    //println!("{}", &source[extend_left.pos..extend_right.pos]);
-    print!("{}", &source[extend_left.pos..s.start.pos]);
-    print!("{SETRED}{}{NOCOLOR}", &source[s.start.pos..=s.end.pos + 1]);
-    println!("{}", &source[s.end.pos + 2..extend_right.pos]);
+    //print!("{}", &source[extend_left.pos..s.start.pos]);
+    //print!("{SETRED}{}{NOCOLOR}", &source[s.start.pos..=s.end.pos + 1]);
+    //println!("{}", &source[s.end.pos + 2..extend_right.pos]);
+    print!("{}", &source[a..b]);
+    print!("{SETRED}{}{NOCOLOR}", &source[b..=c + 1]);
+    println!("{}", &source[c + 2..d]);
 
     for _ in 0..s.start.col {
         print!(" ")

@@ -7,7 +7,7 @@ Good example: https://github.com/kaikalii/cube/blob/master/src/lex.rs
 use std::{collections::HashMap, fmt::Display};
 
 #[rustfmt::skip]
-const LEGAL_IDENT_CHARS: [char; 26*2 + 10*2 + 10] = [
+const LEGAL_IDENT_START_CHARS: [char; 26*2 + 10*2 + 10] = [
     'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
@@ -22,8 +22,8 @@ const _ASSERT_DISJOINTNESS_BETWEEN_LEGAL_IDENT_CHARS_AND_WHITESPACE: () = {
     let mut w_i = 0;
     while w_i < WHITESPACE.len() {
         let mut id_i = 0;
-        while id_i < LEGAL_IDENT_CHARS.len() {
-            if WHITESPACE[w_i] == LEGAL_IDENT_CHARS[id_i] {
+        while id_i < LEGAL_IDENT_START_CHARS.len() {
+            if WHITESPACE[w_i] == LEGAL_IDENT_START_CHARS[id_i] {
                 panic!("comptime check failed: There's a char that's in both WHITESPACE and LEGAL_IDENT_CHARS")
             };
             id_i += 1;
@@ -104,6 +104,9 @@ impl Loc {
             line: newlines_seen,
             col: pos - last_newline_pos.unwrap_or_default(),
         }
+    }
+    fn to_byte_index(input: &str, char_pos: usize) -> Option<usize> {
+        input.char_indices().map(|(i, _)| i).nth(char_pos)
     }
 }
 
@@ -260,7 +263,7 @@ impl<'l> Lexer<'l> {
     }
 
     fn can_continue(&self) -> bool {
-        self.loc.pos < self.input.len()
+        self.loc.pos < self.input.chars().count()
     }
 
     fn next_char(&mut self) -> Result<(Loc, Option<char>), LexError> {
@@ -269,12 +272,7 @@ impl<'l> Lexer<'l> {
 
     fn run(mut self) -> Result<Vec<Token<'l>>, LexError> {
         use TokenKind as TK;
-        if Some(false) == self.input.chars().last().map(|c| c == '\n') {
-            println!(
-                "{} is not newline (is '{}')",
-                self.input,
-                self.input.chars().last().unwrap()
-            );
+        if !self.input.ends_with(|c| c == '\n') {
             let loc = Loc::from_pos(self.input, self.input.len());
             return Err(LexError {
                 span: Span {
@@ -324,7 +322,7 @@ impl<'l> Lexer<'l> {
                         }
                         '\'' => (with_span(TK::Quote, start, self.loc), self),
                         x if x.is_ascii_digit() => self.lex_number(prev_loc),
-                        c if LEGAL_IDENT_CHARS.contains(&c) => {
+                        c if LEGAL_IDENT_START_CHARS.contains(&c) => {
                             let (probable_ident, l) = self.lex_identifier(prev_loc);
                             let Token {
                                 typ: TokenKind::Identifier(ident),
@@ -373,7 +371,7 @@ impl<'l> Lexer<'l> {
             .chars()
             .skip(start.pos)
             .enumerate()
-            .find(|(_, c)| !LEGAL_IDENT_CHARS.contains(c))
+            .find(|(_, c)|  *c == '(' || *c == ')' || WHITESPACE.contains(c))
             .unwrap();
 
         if ident_len == 0 {
@@ -385,9 +383,14 @@ impl<'l> Lexer<'l> {
             line: self.loc.line,
             col: start.col + ident_len,
         };
+
+        // TODO: don't unwrap
+        let a = Loc::to_byte_index(self.input, start.pos).unwrap();
+        let b = Loc::to_byte_index(self.input, end_loc.pos).unwrap();
+
         (
             Token {
-                typ: TokenKind::Identifier(&self.input[start.pos..start.pos + ident_len]),
+                typ: TokenKind::Identifier(&self.input[a..b]),
                 span: Span {
                     start,
                     end: end_loc,
