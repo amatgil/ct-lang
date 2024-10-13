@@ -2,11 +2,11 @@ use itertools::izip;
 use std::{collections::HashMap, fmt::Display};
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
-struct Symbol(String);
+pub struct Symbol(String);
 
 /// TODO: enumerate builtin types while allowing for user-defined ones
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
-enum Type {
+pub enum Type {
     Unit,
     Nat,
     Bool,
@@ -15,7 +15,7 @@ enum Type {
 
 /// TODO
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
-enum Atom {
+pub enum Atom {
     Bool(bool),
     Nat(usize),
 }

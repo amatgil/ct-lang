@@ -61,7 +61,7 @@ lazy_static::lazy_static! {
     ]);
 }
 
-pub fn lex<'a>(input: &'a str) -> Result<Vec<Token<'a>>, LexError> {
+pub fn lex(input: &str) -> Result<Vec<Token<'_>>, LexError> {
     Lexer {
         input,
         loc: Loc {
@@ -185,18 +185,13 @@ impl<'l> Lexer<'l> {
         &mut self,
         f: impl Fn(char) -> bool,
     ) -> Result<(Loc, Option<char>), LexError> {
-        let c = self
-            .input
-            .chars()
-            .skip(self.loc.pos)
-            .next()
-            .ok_or(LexError {
-                span: Span {
-                    start: self.loc,
-                    end: self.loc,
-                },
-                kind: LexErrorKind::UnexpectedEOF,
-            })?;
+        let c = self.input.chars().nth(self.loc.pos).ok_or(LexError {
+            span: Span {
+                start: self.loc,
+                end: self.loc,
+            },
+            kind: LexErrorKind::UnexpectedEOF,
+        })?;
 
         let prev = self.loc;
 
@@ -224,7 +219,7 @@ impl<'l> Lexer<'l> {
         Ok(n)
     }
     fn advance_cursor_until(&mut self, f: impl Fn(char) -> bool) -> Result<usize, LexError> {
-        Ok(self.advance_cursor_while(|c| !f(c))?)
+        self.advance_cursor_while(|c| !f(c))
     }
     fn advance_cursor_amount(&mut self, amount: usize) -> Result<(), LexError> {
         for _ in 0..amount {
@@ -328,7 +323,7 @@ impl<'l> Lexer<'l> {
                             )
                         }
                         '\'' => (with_span(TK::Quote, start, self.loc), self),
-                        x if x.is_digit(10) => self.lex_number(prev_loc),
+                        x if x.is_ascii_digit() => self.lex_number(prev_loc),
                         c if LEGAL_IDENT_CHARS.contains(&c) => {
                             let (probable_ident, l) = self.lex_identifier(prev_loc);
                             let Token {
@@ -378,8 +373,7 @@ impl<'l> Lexer<'l> {
             .chars()
             .skip(start.pos)
             .enumerate()
-            .skip_while(|(_, c)| LEGAL_IDENT_CHARS.contains(&c))
-            .next()
+            .find(|(_, c)| !LEGAL_IDENT_CHARS.contains(c))
             .unwrap();
 
         if ident_len == 0 {
