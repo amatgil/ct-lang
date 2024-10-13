@@ -33,17 +33,13 @@ pub fn display_error_at_token(s: Span, source: &str, help_text: &str) {
     //    ^   ^       ^    ^
     //    a   b       c    d
 
-    // TODO: don't unwrap
-    let a = source.char_indices().map(|(i, _)| i).nth(extend_left.pos).unwrap();
-    let b = source.char_indices().map(|(i, _)| i).nth(s.start.pos).unwrap();
-    let c = source.char_indices().map(|(i, _)| i).nth(s.end.pos).unwrap();
-    let d = source.char_indices().map(|(i, _)| i).nth(extend_right.pos).unwrap();
+    let a = extend_left.pos;
+    let b = s.start.pos;
+    let c = s.end.pos;
+    let d = extend_right.pos;
 
     println!();
 
-    //print!("{}", &source[extend_left.pos..s.start.pos]);
-    //print!("{SETRED}{}{NOCOLOR}", &source[s.start.pos..=s.end.pos + 1]);
-    //println!("{}", &source[s.end.pos + 2..extend_right.pos]);
     print!("{}", &source[a..b]);
     print!("{SETRED}{}{NOCOLOR}", &source[b..=c + 1]);
     println!("{}", &source[c + 2..d]);

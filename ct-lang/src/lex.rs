@@ -80,6 +80,7 @@ pub struct Lexer<'a> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+/// Index (BYTE-WISE) into some text
 pub struct Loc {
     pub pos: usize,
     pub line: usize,
@@ -88,21 +89,21 @@ pub struct Loc {
 
 impl Loc {
     /// Calculates all fields of `Loc` from a position. If this position is
-    /// greater than input.len(), it returns the description of the last character
-    fn from_pos(input: &str, pos: usize) -> Self {
+    /// greater than input.len(), it returns the description of the last character.
+    fn from_pos(input: &str, byte_offset: usize) -> Self {
         let mut newlines_seen = 0;
         let mut last_newline_pos = None;
-        for (i, c) in input.chars().enumerate().take(pos) {
-            if c == '\n' {
+        for (i, c) in input.bytes().enumerate().take(byte_offset) {
+            if c == b'\n' {
                 newlines_seen += 1;
                 last_newline_pos = Some(i);
             }
         }
 
         Loc {
-            pos,
+            pos: byte_offset,
             line: newlines_seen,
-            col: pos - last_newline_pos.unwrap_or_default(),
+            col: byte_offset - last_newline_pos.unwrap_or_default(),
         }
     }
     fn to_byte_index(input: &str, char_pos: usize) -> Option<usize> {
@@ -188,13 +189,17 @@ impl<'l> Lexer<'l> {
         &mut self,
         f: impl Fn(char) -> bool,
     ) -> Result<(Loc, Option<char>), LexError> {
-        let c = self.input.chars().nth(self.loc.pos).ok_or(LexError {
+        let b = self.input.bytes().nth(self.loc.pos).ok_or(LexError {
             span: Span {
                 start: self.loc,
                 end: self.loc,
             },
             kind: LexErrorKind::UnexpectedEOF,
         })?;
+
+        let char_start = self.loc.pos;
+        let char_end = self.loc.pos + todo!(); 
+        let c: char = self.input[char_start..char_end];
 
         let prev = self.loc;
 
