@@ -115,7 +115,7 @@ pub struct Span {
 }
 
 impl Span {
-    fn from_poss(input: &str, a: usize, b: usize) -> Self {
+    pub fn from_poss(input: &str, a: usize, b: usize) -> Self {
         Span {
             start: Loc::from_pos(input, a),
             end: Loc::from_pos(input, b),
