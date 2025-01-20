@@ -18,15 +18,20 @@ data Function = IHaveNoIdeaWhatWouldGoHere
   deriving (Show, Eq)
 
 data SExpr
-  = Cons SExpr SExpr
+  = ConsCell SExpr SExpr
   | Atom Atom
   deriving (Show, Eq)
 
 newtype Env = Env (M.Map String Atom)
 
+-- Ideas: https://cs61a.org/articles/scheme-builtins/
 data BuiltIn
-  = Eval
-  | If
+  = Eval -- Half of the metacircular evaluator
+  | Apply -- The other half of the metacircular evaluator
+  | If -- Conditional Primitive
+  | Car 
+  | Cdr 
+  | Cons 
   deriving (Show, Eq)
 
 bareEnv :: Env
@@ -37,5 +42,5 @@ bareEnv = Env $ M.fromList
 
 uncons :: SExpr -> (SExpr, SExpr)
 uncons s = case s of
-  Cons x y -> (x, y)
-  _ -> error "Cannot uncons if it's not cons" -- TODO: Return Either
+  ConsCell x y -> (x, y)
+  _ -> error "Cannot uncons if it's not cons cell" -- TODO: Return Either

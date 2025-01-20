@@ -4,7 +4,7 @@ import CTLang.AST
 eval :: SExpr -> Env -> (Atom, Env)
 eval input env = case input of
   Atom a -> (a, env)
-  Cons left right ->
+  ConsCell left right ->
     let (l, env') = eval left env
      in case l of
           BuiltIn b -> evalBuiltIn b env right
