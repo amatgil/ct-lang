@@ -2,18 +2,21 @@ module CTLang.AST where
 
 import qualified Data.Map as M
 
-data Atom 
-  = String String  -- "Haii"
-  | Int Int        -- 42
-  | Bool Bool      -- #true, #false
-  | Float Float    -- 1.2
+data Atom
+  = String String -- "Haii"
+  | Int Int -- 42
+  | Bool Bool -- #true, #false
+  | Float Float -- 1.2
   | Keyword String -- :foo
-  | Symbol String  -- something
+  | Symbol String -- something
   | BuiltIn BuiltIn
-  | Lambda Function
+  | Lambda
+      { args :: SExpr,
+        body :: Atom
+      }
   | Nil
   deriving (Show, Eq)
-  
+
 data Function = IHaveNoIdeaWhatWouldGoHere
   deriving (Show, Eq)
 
@@ -31,13 +34,20 @@ data BuiltIn
   | If -- Conditional Primitive
   | Car 
   | Cdr 
-  | Cons 
+  | Cons
+  | Quote
+  | Define
   deriving (Show, Eq)
 
 bareEnv :: Env
 bareEnv = Env $ M.fromList
   [("eval", BuiltIn Eval)
   , ("if", BuiltIn If)
+  , ("car", BuiltIn Car)
+  , ("cdr", BuiltIn Cdr)
+  , ("cons", BuiltIn Cons)
+  , ("quote", BuiltIn Quote)
+  , ("define", BuiltIn Define)
   ]
 
 uncons :: SExpr -> (SExpr, SExpr)
