@@ -248,7 +248,9 @@ impl<'l> Lexer<'l> {
                     //        },
                     //    }
                     //}
+                    todo!()
                 };
+                tokens.push(t);
                 //if let (prev_loc, Some(c)) = self.next_char()? {
                 //    let (t, l) = match c {
                 //        '(' => (with_span(TK::ParenOpen, start, self.loc), self),
