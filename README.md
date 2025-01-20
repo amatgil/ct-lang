@@ -182,5 +182,6 @@ Which both returns the `type`, but bounded.
 - https://craftinginterpreters.com/
 - Making an interpreter: https://vishpat.github.io/lisp-rs/overview.html
 - Language writing: https://cs.brown.edu/courses/cs173/2012/book/
+- https://bernsteinbear.com/blog/lisp/00_fundamentals/
 
 [^1]: Get it? It's a _lisp_ called '_Ç_-lang', hehe.
