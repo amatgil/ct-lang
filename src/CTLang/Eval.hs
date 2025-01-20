@@ -1,15 +1,12 @@
-module Eval where
+module CTLang.Eval where
 import CTLang.AST 
 
-eval :: SExpr -> Env -> Atom
-eval input = case input of
-  Atom a -> a
-  List [] -> error "Cannot evaluate empty list" -- TODO: return Either
-  List (e : es) ->
-    let f = e
-     in case eval e env of
-          Symbol s -> undefined -- call function `s` with argument list `es`
-          x -> error "Can not call as function"
-    
-  
-  
+eval :: SExpr -> Env -> (Atom, Env)
+eval input env = case input of
+  Atom a -> (a, env)
+  Cons left right ->
+    let (l, env') = eval left env
+     in case l of
+          Symbol s -> undefined -- call s with `right` as arguments
+          _ -> error "Tried to evaluate cons that wasn't a symbol"
+
