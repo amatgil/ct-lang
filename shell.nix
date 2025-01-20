@@ -4,21 +4,17 @@
 }:
 let
   packages = with pkgs; [
-    cargo
-    rustc
-    rust-analyzer
-    rustfmt
-    clippy
-    clang
-    mold
-    gnuplot
-    heaptrack
-    valgrind
-    ffmpeg
-    gdb
+    haskell-language-server
+    ghc
+    ghcid # Bacon for haskell
+    cabal-install
+    haskellPackages.hindent
+    #haskellPackages.hls
+    haskellPackages.lsp
   ];
 in
 pkgs.mkShell {
+  # Get dependencies from the main package
   nativeBuildInputs = packages;
   buildInputs = packages;
   env = {
