@@ -10,11 +10,11 @@ data Atom
   | Keyword String -- :foo
   | Symbol String -- something
   | BuiltIn BuiltIn
-  | Lambda
-      { args :: SExpr,
-        body :: Atom
-      }
+  | Clojure Clojure
   | Nil
+  deriving (Show, Eq)
+
+data Clojure = C
   deriving (Show, Eq)
 
 data Function = IHaveNoIdeaWhatWouldGoHere
@@ -26,6 +26,7 @@ data SExpr
   deriving (Show, Eq)
 
 newtype Env = Env (M.Map String Atom)
+  deriving (Show)
 
 -- Ideas: https://cs61a.org/articles/scheme-builtins/
 data BuiltIn
@@ -37,6 +38,7 @@ data BuiltIn
   | Cons
   | Quote
   | Define
+  | Closure
   deriving (Show, Eq)
 
 bareEnv :: Env
@@ -48,7 +50,11 @@ bareEnv = Env $ M.fromList
   , ("cons", BuiltIn Cons)
   , ("quote", BuiltIn Quote)
   , ("define", BuiltIn Define)
+  --, ("lambda", Built)
   ]
+
+lookup :: String -> Env -> Maybe Atom
+lookup s (Env m) = M.lookup s m
 
 uncons :: SExpr -> (SExpr, SExpr)
 uncons s = case s of

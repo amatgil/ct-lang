@@ -1,8 +1,10 @@
 module Main where
 
-import qualified MyLib (someFunc)
+import CTLang.AST
+import CTLang.Eval
+
+evaled = eval (Atom (Int 7)) $ bareEnv
 
 main :: IO ()
-main = do
-  putStrLn "Hello, Haskell!"
-  MyLib.someFunc
+main = print evaled
+  -- putStrLn "Hello, Haskell!"
